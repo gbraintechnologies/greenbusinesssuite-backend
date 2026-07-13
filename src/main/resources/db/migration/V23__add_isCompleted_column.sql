@@ -1,0 +1,2 @@
+ALTER TABLE business_profile
+ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT FALSE;

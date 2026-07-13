@@ -1,0 +1,2 @@
+ALTER TABLE notification_message
+ADD COLUMN IF NOT EXISTS times_sent INTEGER DEFAULT 0;

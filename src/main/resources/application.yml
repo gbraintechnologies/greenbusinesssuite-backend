@@ -1,0 +1,118 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: Mesh-Business-Backend
+
+  datasource:
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mesh_suite_db}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: ${SHOW_SQL:false}
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate-naming-physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    url: ${FLYWAY_URL}
+    user: ${FLYWAY_USER}
+    password: ${FLYWAY_PASSWORD}
+    schemas: ${SPRING_FLYWAY_SCHEMAS:public}
+    table: ${SPRING_FLYWAY_TABLE:flyway_schema_history}
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:10MB}
+
+  mail:
+    host: ${EMAIL_HOST:smtp.gmail.com}
+    port: ${EMAIL_PORT:587}
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            enable: false
+          connectiontimeout: 30000
+          timeout: 30000
+          writetimeout: 30000
+        debug: ${MAIL_DEBUG:false}
+
+# Payment Configuration
+pay:
+  client-secret: ${PAYMENT_CLIENT_SECRET}
+  client-id: ${PAYMENT_CLIENT_ID}
+  service-id: ${PAYMENT_SERVICE_ID}
+  callback-base-url: ${PAYMENT_CALLBACK_URL}
+
+# Storage Configuration (Contabo S3)
+storage:
+  s3:
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region: ${AWS_REGION:eu-central-1}
+    bucket-name: ${AWS_BUCKET_NAME}
+    endpoint: ${AWS_ENDPOINT}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+# Logging Configuration
+logging:
+  level:
+    org.springframework.web: ${LOG_LEVEL_WEB:INFO}
+    com.mesh_suite: ${LOG_LEVEL_APP:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_JDBC:WARN}
+    org.springframework.mail: ${LOG_LEVEL_MAIL:WARN}
+    javax.mail: ${LOG_LEVEL_MAIL:WARN}
+
+# CORS Allowed Origins
+app:
+  allowed-origins:
+    - http://localhost:3000
+    - https://entityrail.com
+    - https://api.entityrail.com
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
