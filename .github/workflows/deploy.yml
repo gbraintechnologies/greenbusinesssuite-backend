@@ -1,0 +1,41 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: gbs-backend-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /var/www/greenbusinesssuite-backend
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose up --build -d
+            echo "Waiting for backend health..."
+            for i in $(seq 1 30); do
+              if docker exec gbs_backend curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1 \
+                || docker exec gbs_backend curl -fsS http://localhost:8081/health >/dev/null 2>&1; then
+                echo "Backend healthy"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "Backend failed health check"
+            docker compose logs --tail=100 backend
+            exit 1

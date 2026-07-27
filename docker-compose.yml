@@ -1,0 +1,84 @@
+# Green Business Suite — Spring Boot API + Postgres + pgAdmin
+# Joins external network `greenbusinesssuite` (created by gbscaddy/setup-networks.sh).
+# Do not publish app ports to the host; Caddy reaches containers by name.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: gbs_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-greenbusinesssuite}
+      POSTGRES_USER: ${POSTGRES_USER:-gbs_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - greenbusinesssuite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gbs_user} -d ${POSTGRES_DB:-greenbusinesssuite}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: gbs_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@greenbusinesssuite.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - greenbusinesssuite
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gbs-backend:latest
+    container_name: gbs_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-greenbusinesssuite}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-gbs_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DDL_AUTO: ${DDL_AUTO:-none}
+      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-greenbusinesssuite}
+      FLYWAY_USER: ${POSTGRES_USER:-gbs_user}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-true}
+      SPRING_FLYWAY_SCHEMAS: public
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+    networks:
+      - greenbusinesssuite
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || curl -f http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  greenbusinesssuite:
+    external: true
+    name: greenbusinesssuite

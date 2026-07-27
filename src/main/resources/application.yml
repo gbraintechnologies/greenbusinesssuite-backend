@@ -25,9 +25,10 @@ spring:
           time_zone: UTC
 
   flyway:
-    url: ${FLYWAY_URL}
-    user: ${FLYWAY_USER}
-    password: ${FLYWAY_PASSWORD}
+    enabled: ${FLYWAY_ENABLED:true}
+    url: ${FLYWAY_URL:${SPRING_DATASOURCE_URL}}
+    user: ${FLYWAY_USER:${SPRING_DATASOURCE_USERNAME}}
+    password: ${FLYWAY_PASSWORD:${SPRING_DATASOURCE_PASSWORD}}
     schemas: ${SPRING_FLYWAY_SCHEMAS:public}
     table: ${SPRING_FLYWAY_TABLE:flyway_schema_history}
     locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
@@ -94,6 +95,9 @@ logging:
 app:
   allowed-origins:
     - http://localhost:3000
+    - https://greenbusinesssuite.com
+    - https://www.greenbusinesssuite.com
+    - https://api.greenbusinesssuite.com
     - https://entityrail.com
     - https://api.entityrail.com
 
