@@ -41,7 +41,7 @@ spring:
       max-request-size: ${MAX_REQUEST_SIZE:10MB}
 
   mail:
-    host: ${EMAIL_HOST:smtp.gmail.com}
+    host: ${EMAIL_HOST:smtp.zeptomail.com}
     port: ${EMAIL_PORT:587}
     username: ${EMAIL_USERNAME}
     password: ${EMAIL_PASSWORD}
@@ -55,10 +55,18 @@ spring:
             required: true
           ssl:
             enable: false
+            protocols: TLSv1.2
+          from: ${EMAIL_FROM:noreply@greenbusinesssuite.com}
           connectiontimeout: 30000
           timeout: 30000
           writetimeout: 30000
         debug: ${MAIL_DEBUG:false}
+
+# Outbound email identity (ZeptoMail SMTP auth user is emailapikey, not the From address)
+app:
+  mail:
+    from: ${EMAIL_FROM:noreply@greenbusinesssuite.com}
+    from-name: ${EMAIL_FROM_NAME:Mesh Team}
 
 # Payment Configuration
 pay:

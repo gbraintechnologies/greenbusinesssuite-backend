@@ -26,8 +26,11 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${app.mail.from}")
     private String mailFrom;
+
+    @Value("${app.mail.from-name:Mesh Team}")
+    private String mailFromName;
 
     private String resolveVerificationLink(HttpServletRequest request, String email) {
 
@@ -80,7 +83,7 @@ public class EmailService {
     private void sendEmail(String toEmail, String subject, String content, boolean isHtml) throws MessagingException, UnsupportedEncodingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        helper.setFrom(mailFrom, "Mesh Team");
+        helper.setFrom(mailFrom, mailFromName);
         helper.setTo(toEmail);
         helper.setSubject(subject);
         helper.setText(content, isHtml);
@@ -94,7 +97,7 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, attachmentPath != null, "UTF-8");
-            helper.setFrom(mailFrom, "Mesh Team"); // Changed to mailFrom for consistency
+            helper.setFrom(mailFrom, mailFromName);
             helper.setTo(recipientEmail);
             helper.setSubject(subject);
             helper.setText(body, isHtml);
