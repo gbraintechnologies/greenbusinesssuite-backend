@@ -34,7 +34,11 @@ public final class AppConstants {
             "https://staging.thefaithhq.com",
             "https://thefaithhq.com",
             "https://entityrail.com",
-            "https://api.entityrail.com"
+            "https://www.entityrail.com",
+            "https://api.entityrail.com",
+            "https://greenbusinesssuite.com",
+            "https://www.greenbusinesssuite.com",
+            "https://api.greenbusinesssuite.com"
     };
 
     public static final String DEFAULT_TENANT_ID = "mesh_suite_db";
