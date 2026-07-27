@@ -62,12 +62,6 @@ spring:
           writetimeout: 30000
         debug: ${MAIL_DEBUG:false}
 
-# Outbound email identity (ZeptoMail SMTP auth user is emailapikey, not the From address)
-app:
-  mail:
-    from: ${EMAIL_FROM:noreply@greenbusinesssuite.com}
-    from-name: ${EMAIL_FROM_NAME:Mesh Team}
-
 # Payment Configuration
 pay:
   client-secret: ${PAYMENT_CLIENT_SECRET}
@@ -99,8 +93,12 @@ logging:
     org.springframework.mail: ${LOG_LEVEL_MAIL:WARN}
     javax.mail: ${LOG_LEVEL_MAIL:WARN}
 
-# CORS Allowed Origins
+# App settings (CORS + outbound email identity)
+# ZeptoMail SMTP auth user is emailapikey; From uses EMAIL_FROM separately.
 app:
+  mail:
+    from: ${EMAIL_FROM:noreply@greenbusinesssuite.com}
+    from-name: ${EMAIL_FROM_NAME:Mesh Team}
   allowed-origins:
     - http://localhost:3000
     - https://greenbusinesssuite.com
