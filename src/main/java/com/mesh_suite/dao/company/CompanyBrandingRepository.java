@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface CompanyBrandingRepository extends JpaRepository<CompanyBranding, Long> {
     Optional<CompanyBranding> findByTenancyId(String tenancyId);
+    Optional<CompanyBranding> findByCompanyId(Long companyId);
     void deleteByTenancyId(String tenancyId);
 }

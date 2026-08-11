@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping(value = "/mesh-suite/v1.0/company-branding", produces = MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
@@ -45,6 +46,7 @@ public class CompanyBrandingController {
         CompanyBranding companyBranding = companyBrandingService.findById(id);
         return ResponseEntity.ok(companyBranding);
     }
+
     @PutMapping("/update")
     @Operation(summary = "Update a Company Branding")
     public ResponseEntity<CompanyBrandingDTO> updateCompanyBranding(@RequestBody CompanyBrandingDTO companyBrandingDTO) {
@@ -62,6 +64,44 @@ public class CompanyBrandingController {
         return companyBrandingService.findByTenancyId(tenancyId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Find Company Branding Details by Company ID",
+            description = "Fetches the company branding details for a created company by company ID.")
+    @GetMapping("/find-by-company-id/{companyId}")
+    public ResponseEntity<CompanyBrandingDetailsDTO> findByCompanyId(@PathVariable Long companyId) {
+        return companyBrandingService.findDetailsByCompanyId(companyId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+
+    @Operation(summary = "Upload company branding logo by tenancy ID")
+    @PostMapping(value = "/tenancy/{tenancyId}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CompanyBranding> uploadLogoByTenancyId(
+            @PathVariable String tenancyId,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(companyBrandingService.uploadLogoByTenancyId(tenancyId, file));
+    }
+
+    @Operation(summary = "Upload company branding logo by company ID")
+    @PostMapping(value = "/company/{companyId}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CompanyBranding> uploadLogoByCompanyId(
+            @PathVariable Long companyId,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(companyBrandingService.uploadLogoByCompanyId(companyId, file));
+    }
+
+    @Operation(summary = "Delete company branding logo by tenancy ID")
+    @DeleteMapping("/tenancy/{tenancyId}/logo")
+    public ResponseEntity<CompanyBranding> deleteLogoByTenancyId(@PathVariable String tenancyId) {
+        return ResponseEntity.ok(companyBrandingService.deleteLogoByTenancyId(tenancyId));
+    }
+
+    @Operation(summary = "Delete company branding logo by company ID")
+    @DeleteMapping("/company/{companyId}/logo")
+    public ResponseEntity<CompanyBranding> deleteLogoByCompanyId(@PathVariable Long companyId) {
+        return ResponseEntity.ok(companyBrandingService.deleteLogoByCompanyId(companyId));
     }
 
 
@@ -85,6 +125,7 @@ public class CompanyBrandingController {
         Paginate<CompanyBranding> branding = companyBrandingService.getAllCompanyBranding(page, size);
         return ResponseEntity.ok(branding);
     }
+
     @Operation(summary = "Delete  Company branding by tenantId")
     @DeleteMapping("/tenant/{tenantId}")
     public ResponseEntity<Void> deleteByTenancyId(@PathVariable String tenantId) {
