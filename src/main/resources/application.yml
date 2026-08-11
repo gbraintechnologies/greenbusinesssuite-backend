@@ -1,5 +1,8 @@
 server:
   port: ${SERVER_PORT:8081}
+  tomcat:
+    # Allow slower multipart uploads (logos/media) without SocketTimeoutException
+    connection-timeout: ${TOMCAT_CONNECTION_TIMEOUT:120000}
 
 spring:
   application:

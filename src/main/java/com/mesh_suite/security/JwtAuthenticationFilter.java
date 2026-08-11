@@ -153,13 +153,50 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void resolvePublicTenant(HttpServletRequest request, String path) {
-        String tenantId = request.getParameter(AppConstants.TENANT_ID_PARAM);
+        // Prefer header. Never call request.getParameter() for multipart uploads —
+        // that forces Tomcat to parse the body in the filter and can time out
+        // (MultipartException / SocketTimeoutException) before the controller runs.
+        String tenantId = request.getHeader(AppConstants.TENANT_ID_PARAM);
         if (!StringUtils.hasText(tenantId)) {
-            tenantId = request.getHeader(AppConstants.TENANT_ID_PARAM);
+            tenantId = getQueryParam(request, AppConstants.TENANT_ID_PARAM);
+        }
+        if (!StringUtils.hasText(tenantId) && !isMultipart(request)) {
+            tenantId = request.getParameter(AppConstants.TENANT_ID_PARAM);
         }
         String finalTenant = StringUtils.hasText(tenantId) ? tenantId : AppConstants.DEFAULT_TENANT_ID;
         TenantContext.setCurrentTenant(finalTenant);
         log.debug("Public endpoint '{}', tenant set to: {}", path, finalTenant);
+    }
+
+    private static boolean isMultipart(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase().startsWith("multipart/");
+    }
+
+    /**
+     * Reads a single query-string parameter without touching the request body.
+     */
+    private static String getQueryParam(HttpServletRequest request, String name) {
+        String query = request.getQueryString();
+        if (!StringUtils.hasText(query)) {
+            return null;
+        }
+        for (String pair : query.split("&")) {
+            int eq = pair.indexOf('=');
+            String key = eq >= 0 ? pair.substring(0, eq) : pair;
+            if (!name.equals(key)) {
+                continue;
+            }
+            if (eq < 0) {
+                return "";
+            }
+            try {
+                return java.net.URLDecoder.decode(pair.substring(eq + 1), java.nio.charset.StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                return pair.substring(eq + 1);
+            }
+        }
+        return null;
     }
 
     @Override
