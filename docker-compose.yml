@@ -62,6 +62,12 @@ services:
       FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-true}
       SPRING_FLYWAY_SCHEMAS: public
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      # Contabo Object Storage (S3-compatible) — bucket https://usc1.contabostorage.com/mbs
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-mbs}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-https://usc1.contabostorage.com}
     networks:
       - greenbusinesssuite
     depends_on:

@@ -15,17 +15,45 @@ jobs:
     steps:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
+          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
           script_stop: true
           script: |
             set -euo pipefail
             cd /var/www/greenbusinesssuite-backend
             git fetch origin main
             git reset --hard origin/main
+            # Ensure Contabo Object Storage settings are present in server .env
+            # Bucket URL: https://usc1.contabostorage.com/mbs
+            touch .env
+            set_env() {
+              local key="$1"
+              local value="$2"
+              if [ -z "$value" ]; then
+                return 0
+              fi
+              if grep -q "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${value}|" .env
+              else
+                echo "${key}=${value}" >> .env
+              fi
+            }
+            set_env AWS_REGION us-east-1
+            set_env AWS_BUCKET_NAME mbs
+            set_env AWS_ENDPOINT https://usc1.contabostorage.com
+            set_env AWS_ACCESS_KEY_ID "$AWS_ACCESS_KEY_ID"
+            set_env AWS_SECRET_ACCESS_KEY "$AWS_SECRET_ACCESS_KEY"
+            if ! grep -q '^AWS_ACCESS_KEY_ID=.\+' .env || ! grep -q '^AWS_SECRET_ACCESS_KEY=.\+' .env; then
+              echo "ERROR: Contabo credentials missing in .env (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)"
+              exit 1
+            fi
             docker compose up --build -d
             echo "Waiting for backend health..."
             for i in $(seq 1 30); do
