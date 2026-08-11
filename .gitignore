@@ -57,3 +57,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Local deploy SSH keys (never commit)
+.deploy_key
+.deploy_key.pub

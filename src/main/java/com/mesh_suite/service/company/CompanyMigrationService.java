@@ -72,8 +72,10 @@ public class CompanyMigrationService {
 
         } catch (Exception e) {
             log.error("Tenant provisioning failed: {}", tenantId, e);
-            company.setBuildStatus(BuildStatus.FAILED);
-            userCompanyRepository.save(company);
+            userCompanyRepository.findById(companyId).ifPresent(failedCompany -> {
+                failedCompany.setBuildStatus(BuildStatus.FAILED);
+                userCompanyRepository.save(failedCompany);
+            });
         }
     }
 

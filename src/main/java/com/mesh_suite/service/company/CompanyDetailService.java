@@ -1,5 +1,6 @@
 package com.mesh_suite.service.company;
 
+import com.mesh_suite.constant.company.BuildStatus;
 import com.mesh_suite.constant.company.CompanyStatus;
 import com.mesh_suite.constant.forms.UserStatus;
 import com.mesh_suite.dao.company.UserCompanyRepository;
@@ -26,6 +27,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.UnsupportedEncodingException;
 import java.time.LocalDateTime;
@@ -83,8 +86,25 @@ public class CompanyDetailService {
                 dbPassword
         );
 
+        // Mark PENDING before async provisioning so the UI is not stuck on null buildStatus
+        if (userCompany.getBuildStatus() == null) {
+            userCompany.setBuildStatus(BuildStatus.PENDING);
+        }
+
         UserCompany company = userCompanyRepository.save(userCompany);
-        companyMigrationService.provisionTenantDatabase(company.getId());
+        Long companyId = company.getId();
+
+        // Provision only after the company row is committed — @Async can otherwise race the TX
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    companyMigrationService.provisionTenantDatabase(companyId);
+                }
+            });
+        } else {
+            companyMigrationService.provisionTenantDatabase(companyId);
+        }
 
         return UserCompanyMapper.toRegResp(company, "Company setup successful, resource creation started");
     }
