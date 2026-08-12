@@ -49,7 +49,7 @@ public class FormField implements Serializable {
     @Column(name = "max_length")
     private Long maxLength;
 
-    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Schema(defaultValue = "false")
     private Boolean isDeleted = false;
 
@@ -61,13 +61,16 @@ public class FormField implements Serializable {
     @Column(name = "choice_value")
     private List<String> choiceValue = new ArrayList<>();
 
+    @Column(name = "is_mandatory")
     @Schema(defaultValue = "false")
     private Boolean isMandatory=false;
 
+    @Column(name = "horizontal_align")
     @Schema(defaultValue = "false")
     private Boolean horizontalAlign =false;
 
     private String validPattern;
+    @Column(name = "is_statistical_field")
     @Schema(defaultValue = "false")
     private Boolean isStatisticalField =false;
     private String statisticalFunction;

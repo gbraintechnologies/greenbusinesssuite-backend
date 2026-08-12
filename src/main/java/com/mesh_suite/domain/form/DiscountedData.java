@@ -35,7 +35,7 @@ public class DiscountedData {
     private BigDecimal discountAmount;
     @Column(name = "discounted_price")
     private BigDecimal discountedPrice;
-    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     private Boolean isDeleted = false;
     @CreationTimestamp
     private LocalDateTime createdOn;

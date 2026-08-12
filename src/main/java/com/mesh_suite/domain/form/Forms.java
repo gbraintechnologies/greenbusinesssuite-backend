@@ -56,11 +56,11 @@ public class Forms implements Serializable {
     @Column(nullable = false)
     private FormUtils.PublishStatus publishStatus = FormUtils.PublishStatus.DRAFT;
 
-    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Schema(defaultValue = "false")
     private Boolean isDeleted = false;
 
-    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_template", nullable = false, columnDefinition = "boolean default false")
     @Schema(defaultValue = "false")
     private Boolean isTemplate= false;
 

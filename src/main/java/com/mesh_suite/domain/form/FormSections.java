@@ -50,7 +50,7 @@ public class FormSections implements Serializable {
     @OrderBy("ordering ASC")  // Ensure ordering by `ordering` field
     private Set<FormField> formFields = new HashSet<>();
     private Integer ordering;
-    @Column(nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Schema(defaultValue = "false")
     private Boolean isDeleted = false;
 

@@ -47,7 +47,7 @@ public class CurrencySetup implements Serializable {
     private LocalDateTime updatedOn;
     private LocalDateTime deletedOn;
 
-    @Column(name ="is_Deleted",nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Schema(defaultValue = "false")
     private Boolean isDeleted = false;
 }
