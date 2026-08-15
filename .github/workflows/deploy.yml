@@ -13,7 +13,24 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check deploy secrets
+        id: secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Deploy secrets are not set. Skipping remote deploy."
+            echo "Add DEPLOY_HOST, DEPLOY_USER, and DEPLOY_SSH_KEY in Settings → Secrets → Actions."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Same SSH action + 60m timeout as the frontend. Maven docker builds exceed the 10m default.
       - name: Deploy over SSH
+        if: steps.secrets.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.2.0
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -23,6 +40,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
+          command_timeout: 60m
           envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
           script_stop: true
           script: |
@@ -30,40 +48,5 @@ jobs:
             cd /var/www/greenbusinesssuite-backend
             git fetch origin main
             git reset --hard origin/main
-            # Ensure Contabo Object Storage settings are present in server .env
-            # Bucket URL: https://usc1.contabostorage.com/mbs
-            touch .env
-            set_env() {
-              local key="$1"
-              local value="$2"
-              if [ -z "$value" ]; then
-                return 0
-              fi
-              if grep -q "^${key}=" .env; then
-                sed -i "s|^${key}=.*|${key}=${value}|" .env
-              else
-                echo "${key}=${value}" >> .env
-              fi
-            }
-            set_env AWS_REGION us-east-1
-            set_env AWS_BUCKET_NAME mbs
-            set_env AWS_ENDPOINT https://usc1.contabostorage.com
-            set_env AWS_ACCESS_KEY_ID "$AWS_ACCESS_KEY_ID"
-            set_env AWS_SECRET_ACCESS_KEY "$AWS_SECRET_ACCESS_KEY"
-            if ! grep -q '^AWS_ACCESS_KEY_ID=.\+' .env || ! grep -q '^AWS_SECRET_ACCESS_KEY=.\+' .env; then
-              echo "ERROR: Contabo credentials missing in .env (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)"
-              exit 1
-            fi
-            docker compose up --build -d
-            echo "Waiting for backend health..."
-            for i in $(seq 1 30); do
-              if docker exec gbs_backend curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1 \
-                || docker exec gbs_backend curl -fsS http://localhost:8081/health >/dev/null 2>&1; then
-                echo "Backend healthy"
-                exit 0
-              fi
-              sleep 5
-            done
-            echo "Backend failed health check"
-            docker compose logs --tail=100 backend
-            exit 1
+            chmod +x scripts/deploy.sh
+            bash scripts/deploy.sh
