@@ -33,6 +33,11 @@ public class CompanyBranding implements Serializable {
     private String logo;
 
     private String color;
+    @Column(name = "slug", unique = true)
+    private String slug;
+
+    @Column(name = "domain", unique = true)
+    private String domain;
 
     @ElementCollection
     @CollectionTable(name = "company_module_ids", joinColumns = @JoinColumn(name = "branding_id"))

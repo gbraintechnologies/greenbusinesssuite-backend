@@ -14,6 +14,8 @@ public class CompanyBrandingDTO {
     private String companyName;
     private String logo;
     private String color;
+    private String slug;
+    private String domain;
     private Set<Long> moduleIds;
     private Set<Long> categorySpecificModuleIds;
 

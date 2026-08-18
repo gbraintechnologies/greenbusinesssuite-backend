@@ -27,30 +27,48 @@ import java.util.stream.Collectors;
 
 @Service
 public class CompanyBrandingService {
+
     @Autowired
     private CompanyBrandingRepository companyBrandingRepository;
+
     @Autowired
     private ModuleRepository moduleRepository;
+
     @Autowired
     private CategorySpecificModuleRepository categorySpecificModuleRepository;
+
     @Autowired
     private S3Service s3Service;
 
     @Autowired
     private ModelMapper modelMapper;
 
-
     @Transactional
     public Long createCompanyBranding(CompanyBranding companyBranding) {
+
         companyBrandingRepository.findByTenancyId(companyBranding.getTenancyId())
                 .ifPresent(existing -> {
                     throw new DuplicateKeyException("Branding already exists for this tenancy ID: " + companyBranding.getTenancyId());
                 });
 
+
         companyBrandingRepository.findByCompanyId(companyBranding.getCompanyId())
                 .ifPresent(existing -> {
                     throw new DuplicateKeyException("Branding already exists for this company ID: " + companyBranding.getCompanyId());
                 });
+
+        if (companyBranding.getSlug() != null && !companyBranding.getSlug().isBlank()) {
+            if (companyBrandingRepository.existsBySlug(companyBranding.getSlug())) {
+                throw new DuplicateKeyException("Branding already exists for slug: " + companyBranding.getSlug());
+            }
+        }
+
+
+        if (companyBranding.getDomain() != null && !companyBranding.getDomain().isBlank()) {
+            if (companyBrandingRepository.existsByDomain(companyBranding.getDomain())) {
+                throw new DuplicateKeyException("Branding already exists for domain: " + companyBranding.getDomain());
+            }
+        }
 
         CompanyBranding savedCompanyBranding = companyBrandingRepository.save(companyBranding);
         return savedCompanyBranding.getId();
@@ -66,6 +84,15 @@ public class CompanyBrandingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Company branding not found for company ID: " + companyId));
     }
 
+
+    public Optional<CompanyBrandingDetailsDTO> findBySlug(String slug) {
+        return companyBrandingRepository.findBySlug(slug).map(this::mapToDetailsDTO);
+    }
+
+    public Optional<CompanyBrandingDetailsDTO> findByDomain(String domain) {
+        return companyBrandingRepository.findByDomain(domain).map(this::mapToDetailsDTO);
+    }
+
     public CompanyBranding updateCompanyBranding(CompanyBrandingDTO companyBrandingDTO) {
         Optional<CompanyBranding> optionalBranding = companyBrandingRepository.findByTenancyId(companyBrandingDTO.getTenancyId());
 
@@ -78,51 +105,59 @@ public class CompanyBrandingService {
         companyBranding.setCompanyName(companyBrandingDTO.getCompanyName());
         companyBranding.setLogo(companyBrandingDTO.getLogo());
         companyBranding.setColor(companyBrandingDTO.getColor());
+
+
+        if (companyBrandingDTO.getSlug() != null && !companyBrandingDTO.getSlug().isBlank()) {
+            if (!companyBrandingDTO.getSlug().equals(companyBranding.getSlug())) {
+                if (companyBrandingRepository.existsBySlug(companyBrandingDTO.getSlug())) {
+                    throw new DuplicateKeyException("Slug already exists: " + companyBrandingDTO.getSlug());
+                }
+                companyBranding.setSlug(companyBrandingDTO.getSlug());
+            }
+        }
+
+
+        if (companyBrandingDTO.getDomain() != null && !companyBrandingDTO.getDomain().isBlank()) {
+            if (!companyBrandingDTO.getDomain().equals(companyBranding.getDomain())) {
+                if (companyBrandingRepository.existsByDomain(companyBrandingDTO.getDomain())) {
+                    throw new DuplicateKeyException("Domain already exists: " + companyBrandingDTO.getDomain());
+                }
+                companyBranding.setDomain(companyBrandingDTO.getDomain());
+            }
+        }
+
         companyBranding.setModuleIds(companyBrandingDTO.getModuleIds());
         companyBranding.setCategorySpecificModuleIds(companyBrandingDTO.getCategorySpecificModuleIds());
 
         return companyBrandingRepository.save(companyBranding);
     }
 
+    // NEW: Helper method to map to DTO
+    private CompanyBrandingDetailsDTO mapToDetailsDTO(CompanyBranding branding) {
+        Set<CompanyBrandingDetailsDTO.ModuleDTO> modules = fetchModules(branding.getModuleIds());
+        Set<CompanyBrandingDetailsDTO.CategorySpecificModuleDto> categorySpecificModules =
+                fetchCategorySpecificModulesByIds(branding.getCategorySpecificModuleIds());
+
+        return new CompanyBrandingDetailsDTO(
+                branding.getId(),
+                branding.getTenancyId(),
+                branding.getCompanyId(),
+                branding.getCompanyName(),
+                branding.getLogo(),
+                branding.getColor(),
+                branding.getSlug(),
+                branding.getDomain(),
+                modules,
+                categorySpecificModules
+        );
+    }
+
     public Optional<CompanyBrandingDetailsDTO> findByTenancyId(String tenancyId) {
-        return companyBrandingRepository.findByTenancyId(tenancyId).map(branding -> {
-
-            // Fetch the modules based on the moduleIds present in the branding
-            Set<CompanyBrandingDetailsDTO.ModuleDTO> modules = fetchModules(branding.getModuleIds());
-
-            // Fetch and filter category-specific modules by the IDs present in branding
-            Set<CompanyBrandingDetailsDTO.CategorySpecificModuleDto> categorySpecificModules = fetchCategorySpecificModulesByIds(branding.getCategorySpecificModuleIds());
-
-            return new CompanyBrandingDetailsDTO(
-                    branding.getId(),
-                    branding.getTenancyId(),
-                    branding.getCompanyId(),
-                    branding.getCompanyName(),
-                    branding.getLogo(),
-                    branding.getColor(),
-                    modules,
-                    categorySpecificModules
-            );
-        });
+        return companyBrandingRepository.findByTenancyId(tenancyId).map(this::mapToDetailsDTO);
     }
 
     public Optional<CompanyBrandingDetailsDTO> findDetailsByCompanyId(Long companyId) {
-        return companyBrandingRepository.findByCompanyId(companyId).map(branding -> {
-            Set<CompanyBrandingDetailsDTO.ModuleDTO> modules = fetchModules(branding.getModuleIds());
-            Set<CompanyBrandingDetailsDTO.CategorySpecificModuleDto> categorySpecificModules =
-                    fetchCategorySpecificModulesByIds(branding.getCategorySpecificModuleIds());
-
-            return new CompanyBrandingDetailsDTO(
-                    branding.getId(),
-                    branding.getTenancyId(),
-                    branding.getCompanyId(),
-                    branding.getCompanyName(),
-                    branding.getLogo(),
-                    branding.getColor(),
-                    modules,
-                    categorySpecificModules
-            );
-        });
+        return companyBrandingRepository.findByCompanyId(companyId).map(this::mapToDetailsDTO);
     }
 
     @Transactional
@@ -220,7 +255,7 @@ public class CompanyBrandingService {
         }
         return moduleRepository.findAllById(moduleIds)
                 .stream()
-                .filter(Objects::nonNull)  // Filter out null values
+                .filter(Objects::nonNull)
                 .map(module -> new CompanyBrandingDetailsDTO.ModuleDTO(
                         module.getId(),
                         module.getModuleName(),
@@ -231,26 +266,11 @@ public class CompanyBrandingService {
                 .collect(Collectors.toSet());
     }
 
-
-    private Set<CompanyBrandingDetailsDTO.CategorySpecificModuleDto> fetchCategories(Set<Long> categoryIds) {
-        return categorySpecificModuleRepository.findAllById(categoryIds) // Fetch by category IDs
-                .stream()
-                .map(module -> new CompanyBrandingDetailsDTO.CategorySpecificModuleDto(
-                        module.getId(),
-                        module.getModuleName(),
-                        module.getAdminFeatures(),
-                        module.getClientFeatures(),
-                        module.isTemplate()
-                ))
-                .collect(Collectors.toSet());
-    }
-
     private Set<CompanyBrandingDetailsDTO.CategorySpecificModuleDto> fetchCategorySpecificModulesByIds(Set<Long> categorySpecificModuleIds) {
         if (categorySpecificModuleIds == null || categorySpecificModuleIds.isEmpty()) {
             return Collections.emptySet();
         }
 
-        // Fetch the entities matching the provided IDs and map to DTOs
         return categorySpecificModuleRepository.findAllById(categorySpecificModuleIds)
                 .stream()
                 .map(category -> new CompanyBrandingDetailsDTO.CategorySpecificModuleDto(

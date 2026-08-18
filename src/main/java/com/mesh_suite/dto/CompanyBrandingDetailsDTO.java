@@ -1,6 +1,5 @@
 package com.mesh_suite.dto;
 
-import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,7 +16,8 @@ public class CompanyBrandingDetailsDTO {
     private String companyName;
     private String logo;
     private String color;
-
+    private String slug;
+    private String domain;
     private Set<ModuleDTO> modules;
     private Set<CategorySpecificModuleDto> categorySpecificModules;
 
@@ -31,6 +31,7 @@ public class CompanyBrandingDetailsDTO {
         private String adminFeatures;
         private String clientFeatures;
     }
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

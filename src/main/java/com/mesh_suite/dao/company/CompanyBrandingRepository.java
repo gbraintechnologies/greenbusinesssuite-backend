@@ -8,7 +8,17 @@ import java.util.Optional;
 
 @Repository
 public interface CompanyBrandingRepository extends JpaRepository<CompanyBranding, Long> {
+
     Optional<CompanyBranding> findByTenancyId(String tenancyId);
+
     Optional<CompanyBranding> findByCompanyId(Long companyId);
+
     void deleteByTenancyId(String tenancyId);
+    Optional<CompanyBranding> findBySlug(String slug);
+    Optional<CompanyBranding> findByDomain(String domain);
+
+    boolean existsBySlug(String slug);
+
+    boolean existsByDomain(String domain);
+
 }
