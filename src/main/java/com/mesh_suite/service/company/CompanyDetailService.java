@@ -21,14 +21,11 @@ import com.mesh_suite.service.notify.EmailService;
 import com.mesh_suite.util.CodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.UnsupportedEncodingException;
 import java.time.LocalDateTime;
@@ -46,15 +43,6 @@ public class CompanyDetailService {
     private final CodeGenerator codeGenerator;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
-
-    @Value("${spring.datasource.url}")
-    private String masterDbUrl;
-
-    @Value("${spring.datasource.username:}")
-    private String dbUser;
-
-    @Value("${spring.datasource.password:}")
-    private String dbPassword;
 
     @Transactional
     public CompanyRegResp createCompany(CompanyCreateDTO request) throws UnsupportedEncodingException {
@@ -76,52 +64,16 @@ public class CompanyDetailService {
         }
 
         userCompany.generateAndSetCompanyIdentifier();
-
-        // Derive host and port from the master datasource URL — works on any environment
-        String[] hostPort = extractHostAndPort(masterDbUrl);
-        userCompany.setupDatabaseConfig(
-                hostPort[0],
-                Integer.parseInt(hostPort[1]),
-                dbUser,
-                dbPassword
-        );
-
-        // Mark PENDING before async provisioning so the UI is not stuck on null buildStatus
-        if (userCompany.getBuildStatus() == null) {
-            userCompany.setBuildStatus(BuildStatus.PENDING);
-        }
+        userCompany.setBuildStatus(BuildStatus.PENDING);
 
         UserCompany company = userCompanyRepository.save(userCompany);
-        Long companyId = company.getId();
 
-        // Provision only after the company row is committed — @Async can otherwise race the TX
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    companyMigrationService.provisionTenantDatabase(companyId);
-                }
-            });
-        } else {
-            companyMigrationService.provisionTenantDatabase(companyId);
-        }
+        // No physical database to provision anymore — just seed the tenant's default roles
+        // and flip it ACTIVE, atomically with company creation.
+        companyMigrationService.provisionTenant(company);
+        userCompanyRepository.save(company);
 
-        return UserCompanyMapper.toRegResp(company, "Company setup successful, resource creation started");
-    }
-
-    private String[] extractHostAndPort(String jdbcUrl) {
-        // Parses: jdbc:postgresql://host:5432/dbname
-        try {
-            String withoutProtocol = jdbcUrl.substring(jdbcUrl.indexOf("://") + 3);
-            String hostPortPart = withoutProtocol.substring(0, withoutProtocol.indexOf('/'));
-            String[] parts = hostPortPart.split(":");
-            return parts.length == 2
-                    ? new String[]{parts[0], parts[1]}
-                    : new String[]{parts[0], "5432"};
-        } catch (Exception e) {
-            log.error("Failed to extract host/port from JDBC URL: {}", jdbcUrl, e);
-            return new String[]{"localhost", "5432"};
-        }
+        return UserCompanyMapper.toRegResp(company, "Company setup successful");
     }
 
     // ── everything below is unchanged ────────────────────────────────────────

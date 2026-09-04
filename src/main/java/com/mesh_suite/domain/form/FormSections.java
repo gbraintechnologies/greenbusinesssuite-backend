@@ -5,12 +5,14 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.mesh_suite.interceptor.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.io.Serializable;
@@ -26,10 +28,14 @@ import java.util.Set;
 @NoArgsConstructor
 @Schema(description = "Data collection form section table", name="Form Section Schema")
 @JsonIgnoreProperties({"form"})
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class FormSections implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Schema(description = "Form Section name")
     private String name;
@@ -80,5 +86,12 @@ public class FormSections implements Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 }

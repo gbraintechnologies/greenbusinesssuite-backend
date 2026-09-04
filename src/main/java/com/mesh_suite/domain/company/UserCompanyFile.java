@@ -1,10 +1,12 @@
 package com.mesh_suite.domain.company;
 
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDateTime;
 
@@ -14,10 +16,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class UserCompanyFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Column(name = "company_id")
     private Long companyId;
@@ -36,4 +42,11 @@ public class UserCompanyFile {
 
     @Column(name = "user_id")
     private Long userId;
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
+    }
 }

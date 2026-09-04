@@ -4,10 +4,12 @@ import com.mesh_suite.constant.forms.Network;
 import com.mesh_suite.constant.forms.PaymentMethod;
 import com.mesh_suite.constant.forms.PaymentStatus;
 import com.mesh_suite.dto.PaymentDto;
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -18,10 +20,15 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Payment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Column(name = "bill_id", nullable = false)
     private Long billId;
 
@@ -83,6 +90,13 @@ public class Payment {
         this.bankCode = paymentDto.getBankCode();
         this.network = paymentDto.getNetwork();
 
+    }
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 
     public Payment(PaymentDto paymentDto, BigDecimal amount) {

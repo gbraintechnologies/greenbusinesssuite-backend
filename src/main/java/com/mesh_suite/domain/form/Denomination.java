@@ -3,12 +3,14 @@ package com.mesh_suite.domain.form;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.mesh_suite.interceptor.TenantContext;
 import com.mesh_suite.util.FormUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -18,11 +20,15 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Denomination implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Schema(description = "The unique identifier of the denomination")
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @ManyToOne
     @JoinColumn(name = "currency_setup_id")
@@ -41,4 +47,11 @@ public class Denomination implements Serializable {
     @Enumerated(EnumType.STRING)
     @Schema(description = "The type of the denomination", allowableValues = {"Coin", "Note"})
     private FormUtils.DenominationType denominationType;
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
+    }
 }

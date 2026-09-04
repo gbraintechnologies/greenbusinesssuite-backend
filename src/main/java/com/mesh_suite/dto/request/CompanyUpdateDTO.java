@@ -53,8 +53,6 @@ public class CompanyUpdateDTO {
     private Long companyAdminId;
     private String companyCode;
     private BuildStatus buildStatus;
-    private String driverName;
-    private String dbUrl;
 
     private List<Long> assignedFormIds;
 }

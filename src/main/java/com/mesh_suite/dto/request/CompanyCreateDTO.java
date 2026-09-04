@@ -48,8 +48,6 @@ public class CompanyCreateDTO {
     private Long companyAdminId;
     private String companyCode;
     private BuildStatus buildStatus;
-    private String driverName;
-    private String dbUrl;
 
     // List of assigned form IDs
     private List<Long> assignedFormIds;

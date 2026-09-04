@@ -3,12 +3,16 @@ package com.mesh_suite.domain.form;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.mesh_suite.interceptor.TenantContext;
 import com.mesh_suite.util.FormUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.FilterDef;
+import org.hibernate.annotations.ParamDef;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.io.Serializable;
@@ -22,6 +26,8 @@ import java.util.Objects;
 @Data
 @AllArgsConstructor
 @Schema(description = "Forms table", name = "Form Schema")
+@FilterDef(name = "tenantFilter", parameters = @ParamDef(name = "tenantId", type = String.class))
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Forms implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -96,11 +102,22 @@ public class Forms implements Serializable {
 
     @Column(name = "redirect_url")
     private String redirectUrl;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     public Forms() {
         this.formSections = new ArrayList<>();
     }
     public Forms(String name) {
         this.name = name;
+    }
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 
     @Override

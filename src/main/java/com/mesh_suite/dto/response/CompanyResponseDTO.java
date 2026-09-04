@@ -49,8 +49,6 @@ public class CompanyResponseDTO {
     private Long companyAdminId;
     private String companyCode;
     private BuildStatus buildStatus;
-    private String driverName;
-    private String dbUrl;
     private String companyIdentifier;
 
     private List<Long> assignedFormIds;

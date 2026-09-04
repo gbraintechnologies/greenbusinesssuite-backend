@@ -1,12 +1,14 @@
 package com.mesh_suite.domain.form;
 
 import com.mesh_suite.constant.forms.DiscountType;
+import com.mesh_suite.interceptor.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -17,11 +19,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Table(name = "discounts")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Discount {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "discount_type")
@@ -40,4 +46,11 @@ public class Discount {
     @UpdateTimestamp
     @Column(name = "updated_on")
     private LocalDateTime updatedOn;
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
+    }
 }

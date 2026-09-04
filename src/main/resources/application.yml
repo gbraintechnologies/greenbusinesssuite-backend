@@ -22,8 +22,14 @@ spring:
     show-sql: ${SHOW_SQL:false}
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate-naming-physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    # Required: RequestInterceptor enables the per-tenant Hibernate @Filter on the
+    # request-scoped EntityManager, so every repository call in the request must
+    # share that same persistence context.
+    open-in-view: true
     properties:
       hibernate:
+        format_sql: true
+        implicit_naming_strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
         jdbc:
           time_zone: UTC
 

@@ -34,8 +34,6 @@ public class UserCompanyMapper {
                 .companyAdmin(companyAdmin)
                 .companyCode(dto.getCompanyCode())
                 .buildStatus(dto.getBuildStatus())
-                .driverName(dto.getDriverName())
-                .dbUrl(dto.getDbUrl())
                 .assignedFormIds(dto.getAssignedFormIds())
                 .createdOn(java.time.ZonedDateTime.now())
                 .build();
@@ -86,12 +84,6 @@ public class UserCompanyMapper {
             companyAdmin.setId(dto.getCompanyAdminId());
             entity.setCompanyAdmin(companyAdmin);
         }
-        if (dto.getDriverName() != null) {
-            entity.setDriverName(dto.getDriverName());
-        }
-        if (dto.getDbUrl() != null) {
-            entity.setDbUrl(dto.getDbUrl());
-        }
         if (dto.getStatus() != null) {
             entity.setStatus(dto.getStatus());
         }
@@ -138,8 +130,6 @@ public class UserCompanyMapper {
                 .primaryCurrency(entity.getPrimaryCurrency())
                 .secondaryCurrency(entity.getSecondaryCurrency())
                 .companyAdminId(entity.getCompanyAdmin() != null ? entity.getCompanyAdmin().getId() : null)
-                .driverName(entity.getDriverName())
-                .dbUrl(entity.getDbUrl())
                 .companyName(entity.getCompanyName())
                 .status(entity.getStatus())
                 .primaryContactName(entity.getPrimaryContactName())
@@ -187,8 +177,6 @@ public class UserCompanyMapper {
                 .secondaryCurrency(entity.getSecondaryCurrency())
                 .companyAdminId(entity.getCompanyAdmin() != null ? entity.getCompanyAdmin().getId() : null)
                 .companyIdentifier(entity.getCompanyIdentifier())
-                .driverName(entity.getDriverName())
-                .dbUrl(entity.getDbUrl())
                 .status(entity.getStatus())
                 .buildStatus(entity.getBuildStatus())
                 .primaryContactName(entity.getPrimaryContactName())

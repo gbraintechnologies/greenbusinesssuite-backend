@@ -2,7 +2,6 @@ package com.mesh_suite.security;
 
 import com.mesh_suite.constant.shared.AppConstants;
 import com.mesh_suite.dao.company.UserCompanyRepository;
-import com.mesh_suite.interceptor.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,11 +27,7 @@ public class MasterTenantValidator {
             return true;
         }
 
-        // Validate external tenants using master DB
-        String originalTenant = TenantContext.getCurrentTenant();
         try {
-            TenantContext.setCurrentTenant(AppConstants.DEFAULT_TENANT_ID);
-
             boolean exists = userCompanyRepository
                     .findByCompanyIdentifier(tenantId)
                     .isPresent();
@@ -43,8 +38,6 @@ public class MasterTenantValidator {
         } catch (Exception e) {
             log.error("Error validating tenant '{}': {}", tenantId, e.getMessage());
             return false;
-        } finally {
-            TenantContext.setCurrentTenant(originalTenant);
         }
     }
 }

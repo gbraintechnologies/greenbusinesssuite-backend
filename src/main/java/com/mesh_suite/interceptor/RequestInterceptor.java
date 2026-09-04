@@ -1,9 +1,12 @@
 package com.mesh_suite.interceptor;
 
 import com.mesh_suite.constant.shared.AppConstants;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Session;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -12,6 +15,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Slf4j
 public class RequestInterceptor implements HandlerInterceptor {
 
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -30,6 +35,12 @@ public class RequestInterceptor implements HandlerInterceptor {
         } else {
             log.trace("RequestInterceptor: Tenant already set by filter, skipping.");
         }
+
+        // Relies on spring.jpa.open-in-view (default true) so this Session spans the
+        // whole request — every repository call made downstream shares it.
+        entityManager.unwrap(Session.class)
+                .enableFilter("tenantFilter")
+                .setParameter("tenantId", TenantContext.getCurrentTenant());
 
         return true;
     }
