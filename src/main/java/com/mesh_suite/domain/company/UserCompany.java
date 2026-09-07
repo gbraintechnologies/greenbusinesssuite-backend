@@ -114,12 +114,6 @@ public class UserCompany {
     @Enumerated(EnumType.STRING)
     private BuildStatus buildStatus;
 
-    @Column(name = "driver_name")
-    private String driverName;
-
-    @Column(name = "db_url")
-    private String dbUrl;
-
     @Column(name = "company_identifier")
     private String companyIdentifier;
 
@@ -135,20 +129,6 @@ public class UserCompany {
         Random random = new Random();
         int randomNumber = 10000 + random.nextInt(90000);
         return namePart + randomNumber;
-    }
-
-    public void setupDatabaseConfig(String host, int port, String username, String password) {
-        if (this.companyIdentifier == null || this.companyIdentifier.isEmpty()) {
-            throw new IllegalStateException("Company identifier must be generated before setting DB config");
-        }
-
-        this.driverName = "org.postgresql.Driver";
-        this.dbUrl = String.format(
-                "jdbc:postgresql://%s:%d/%s",
-                host,
-                port,
-                this.companyIdentifier // database name == companyIdentifier
-        );
     }
 
 }

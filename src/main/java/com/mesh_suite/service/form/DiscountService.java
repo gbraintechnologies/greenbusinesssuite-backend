@@ -128,7 +128,8 @@ public class DiscountService {
                 discountAmount,
                 discountedPrice,
                 false,
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                null
         );
     }
     @Transactional

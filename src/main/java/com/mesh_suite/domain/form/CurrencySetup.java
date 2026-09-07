@@ -1,6 +1,7 @@
 package com.mesh_suite.domain.form;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.mesh_suite.interceptor.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.io.Serializable;
@@ -20,10 +22,14 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class CurrencySetup implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Schema(description = "The name of the currency")
     private String currency;
@@ -50,4 +56,11 @@ public class CurrencySetup implements Serializable {
     @Column(name = "is_deleted", nullable = false, columnDefinition = "boolean default false")
     @Schema(defaultValue = "false")
     private Boolean isDeleted = false;
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
+    }
 }

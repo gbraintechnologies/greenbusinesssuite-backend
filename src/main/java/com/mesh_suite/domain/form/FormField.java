@@ -4,12 +4,14 @@ package com.mesh_suite.domain.form;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.mesh_suite.interceptor.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.io.Serializable;
@@ -24,10 +26,14 @@ import java.util.List;
 @AllArgsConstructor
 @Schema(description = "Data collection form field table", name = "Form Field Schema")
 @JsonIgnoreProperties({"formSection"})
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class FormField implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     private String name;
 
@@ -89,4 +95,11 @@ public class FormField implements Serializable {
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     @Column(name = "deleted_on")
     private LocalDateTime deletedOn;
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
+    }
 }

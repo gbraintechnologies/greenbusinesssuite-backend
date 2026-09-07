@@ -1,11 +1,13 @@
 package com.mesh_suite.domain.user;
 
 
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +17,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Table(name = "password_reset_tokens")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PasswordResetToken {
 
     @Id
@@ -23,6 +26,9 @@ public class PasswordResetToken {
 
     @Column(nullable = false, unique = true)
     private String token;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -40,6 +46,9 @@ public class PasswordResetToken {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 
     public boolean isExpired() {

@@ -2,11 +2,13 @@ package com.mesh_suite.domain.form;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.hibernate.annotations.Filter;
 
 import java.io.Serializable;
 @Entity
@@ -16,10 +18,14 @@ import java.io.Serializable;
 @AllArgsConstructor
 @JsonIgnoreProperties({"formSection"})
 @ToString(exclude = {"formSection"})
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class FormDataField implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Column(name = "form_field_id")
     private Long formFieldId;
@@ -45,5 +51,12 @@ public class FormDataField implements Serializable {
 
     public boolean isStatisticalField() {
         return isStatisticalField != null && isStatisticalField;
+    }
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 }

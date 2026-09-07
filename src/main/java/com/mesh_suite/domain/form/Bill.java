@@ -5,11 +5,13 @@ import com.mesh_suite.constant.forms.BillingType;
 import com.mesh_suite.constant.forms.Frequency;
 import com.mesh_suite.constant.forms.PaymentMethod;
 import com.mesh_suite.constant.forms.Status;
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -20,11 +22,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Table(name = "billing")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Bill {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Column(name = "form_id")
     private Long formId;
@@ -62,4 +68,11 @@ public class Bill {
     @Column(name = "updated_on")
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private LocalDateTime updatedOn;
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
+    }
 }

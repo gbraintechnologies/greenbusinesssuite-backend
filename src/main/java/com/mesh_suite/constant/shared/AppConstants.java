@@ -42,7 +42,6 @@ public final class AppConstants {
     };
 
     public static final String DEFAULT_TENANT_ID = "mesh_suite_db";
-    public static final String ENTITY_PACKAGE_SCAN = "com.mesh_suite.domain";
     public static final String CALLBACK_PATH = "/mesh-suite/v1.0/payments/trigger/callback";
     public static final String TENANT_ID_PARAM = "tenantid";
     public static final String CHECK_TRANSACTION_URL = "https://orchard-api.anmgw.com/checkTransaction";

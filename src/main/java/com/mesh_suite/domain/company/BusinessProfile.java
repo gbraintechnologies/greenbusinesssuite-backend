@@ -4,11 +4,13 @@ import com.mesh_suite.constant.forms.Gender;
 import com.mesh_suite.constant.forms.Sector;
 import com.mesh_suite.constant.forms.TypeOfBusiness;
 import com.mesh_suite.dto.BusinessProfileDto;
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -18,10 +20,15 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class BusinessProfile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
+
     @Column(name = "company_id")
     private Long companyId;
 
@@ -103,5 +110,12 @@ public class BusinessProfile {
                 socialMediaLink != null && !socialMediaLink.isEmpty() &&
                 businessOwnerIdImage != null && !businessOwnerIdImage.isEmpty() &&
                 businessDocumentImage != null && !businessDocumentImage.isEmpty();
+    }
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 }

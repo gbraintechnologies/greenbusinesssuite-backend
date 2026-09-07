@@ -2,10 +2,12 @@ package com.mesh_suite.domain.user;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mesh_suite.constant.forms.UserStatus;
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.persistence.*;
 import jakarta.transaction.Transactional;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -17,11 +19,15 @@ import java.util.Collection;
 import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_users_tenant_username", columnNames = {"tenant_id", "username"}),
+        @UniqueConstraint(name = "uk_users_tenant_email", columnNames = {"tenant_id", "email"})
+})
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Users implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,7 +39,7 @@ public class Users implements UserDetails {
     @Column(name = "last_name")
     private String lastName;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String username;
 
     @Column(name = "company_identifier")
@@ -42,8 +48,11 @@ public class Users implements UserDetails {
     @Column(name = "reset_code")
     private String resetCode;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String email;
+
+    @Column(name = "tenant_id", nullable = false)
+    private String tenantId;
 
     @Column(nullable = false)
     @JsonIgnore
@@ -101,6 +110,13 @@ public class Users implements UserDetails {
     @PreUpdate
     protected void onUpdate() {
         updatedOn = LocalDateTime.now();
+    }
+
+    @PrePersist
+    private void assignTenant() {
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenant();
+        }
     }
 
     @Override
