@@ -177,6 +177,7 @@ public class UserCompanyMapper {
                 .secondaryCurrency(entity.getSecondaryCurrency())
                 .companyAdminId(entity.getCompanyAdmin() != null ? entity.getCompanyAdmin().getId() : null)
                 .companyIdentifier(entity.getCompanyIdentifier())
+                .smsSenderId(entity.getSmsSenderId())
                 .status(entity.getStatus())
                 .buildStatus(entity.getBuildStatus())
                 .primaryContactName(entity.getPrimaryContactName())

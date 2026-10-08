@@ -644,4 +644,13 @@ public class FormsService {
         formFieldRepository.saveAll(fieldsMap.values());
     }
 
+    public Map<String, String> regenerateApiKey(Long formId) {
+        Forms form = formsRepository.findById(formId)
+                .orElseThrow(() -> new ResourceNotFoundException("Form not found with id: " + formId));
+        String apiKey = FormUtils.generateUniqueApiKey();
+        form.setApiKey(apiKey);
+        formsRepository.save(form);
+        return Map.of("apiKey", apiKey, "api_key", apiKey);
+    }
+
 }

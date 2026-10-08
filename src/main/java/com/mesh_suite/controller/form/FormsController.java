@@ -64,6 +64,12 @@ public class FormsController {
     public ResponseEntity<?> getFormById(@PathVariable(name = "id") Long id) {
         return new ResponseEntity<>(formService.getFormsById(id), HttpStatus.OK);
     }
+
+    @PutMapping("/generate/apikey/{formId}")
+    @Operation(summary = "Regenerate the API key used to submit responses for a form")
+    public ResponseEntity<Map<String, String>> regenerateApiKey(@PathVariable Long formId) {
+        return ResponseEntity.ok(formService.regenerateApiKey(formId));
+    }
     @GetMapping("/access-published-form/{formId}")
     @Operation(summary = "Retrieve Published Form by ID")
     public ResponseEntity<?> getPublishedFormById(@Parameter(description = "ID of the published form to retrieve") @PathVariable("formId") Long formId) {

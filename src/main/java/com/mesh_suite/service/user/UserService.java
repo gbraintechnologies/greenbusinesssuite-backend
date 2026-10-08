@@ -120,11 +120,7 @@ public class UserService {
                     )
             );
 
-            List<UserResponse> response = users.stream()
-                    .map(userMapper::toUserResponse)
-                    .toList();
-
-            return response;
+            return userMapper.toUserResponses(users);
         } catch (Exception e) {
 
             throw e;

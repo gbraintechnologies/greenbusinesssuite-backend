@@ -19,5 +19,16 @@ public interface BusinessProfileRepository extends JpaRepository<BusinessProfile
     @Query("SELECT b.sector, COUNT(b) FROM BusinessProfile b WHERE b.sector IS NOT NULL GROUP BY b.sector")
     List<Object[]> countBySector();
 
+    @Query("""
+            SELECT COUNT(b) FROM BusinessProfile b
+            WHERE b.businessRegistrationNo IS NOT NULL AND TRIM(b.businessRegistrationNo) <> ''
+            """)
+    long countRegistered();
 
+    @Query("""
+            SELECT b.businessAddress, COUNT(b) FROM BusinessProfile b
+            WHERE b.businessAddress IS NOT NULL AND TRIM(b.businessAddress) <> ''
+            GROUP BY b.businessAddress
+            """)
+    List<Object[]> countByAddress();
 }

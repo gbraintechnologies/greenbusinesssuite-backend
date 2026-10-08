@@ -117,6 +117,9 @@ public class UserCompany {
     @Column(name = "company_identifier")
     private String companyIdentifier;
 
+    @Column(name = "sms_sender_id")
+    private String smsSenderId;
+
     public void generateAndSetCompanyIdentifier() {
         if (this.companyName != null && !this.companyName.isEmpty()) {
             this.companyIdentifier = generateCompanyIdentifier(this.companyName);

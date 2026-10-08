@@ -6,7 +6,10 @@ import com.mesh_suite.dto.Paginate;
 import com.mesh_suite.dto.request.*;
 import com.mesh_suite.dto.response.CompanyResponseDTO;
 import com.mesh_suite.dto.response.MessageResponse;
+import com.mesh_suite.dto.request.LegacyCompanyWriteRequest;
+import com.mesh_suite.service.company.CompanyCompatibilityService;
 import com.mesh_suite.service.company.CompanyDetailService;
+import com.mesh_suite.service.company.CompanyResponseEnricher;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,6 +32,8 @@ import java.io.UnsupportedEncodingException;
 public class CompanyController {
 
     private final CompanyDetailService companyDetailService;
+    private final CompanyCompatibilityService companyCompatibilityService;
+    private final CompanyResponseEnricher companyResponseEnricher;
 
     @Operation(summary = "Register new Company Account")
     @PostMapping("/create")
@@ -41,14 +46,14 @@ public class CompanyController {
     @Operation(summary = "Get company by ID")
     @GetMapping("/{id}")
     public ResponseEntity<CompanyResponseDTO> getCompanyDetailById(@PathVariable Long id) {
-        return ResponseEntity.ok(companyDetailService.getById(id));
+        return ResponseEntity.ok(companyResponseEnricher.enrich(companyDetailService.getById(id)));
     }
 
     @Operation(summary = "Search User Company by Company Name")
     @GetMapping("/get-company-by-name/{name}")
     public ResponseEntity<CompanyResponseDTO> searchCompanyByName(
             @PathVariable @NotBlank String name) {
-        return ResponseEntity.ok(companyDetailService.searchByName(name));
+        return ResponseEntity.ok(companyResponseEnricher.enrich(companyDetailService.searchByName(name)));
     }
 
     @Operation(summary = "Search User Company by Status")
@@ -58,7 +63,9 @@ public class CompanyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(companyDetailService.filterByStatus(status, pageable));
+        Paginate<CompanyResponseDTO> result = companyDetailService.filterByStatus(status, pageable);
+        companyResponseEnricher.enrich(result.getContent());
+        return ResponseEntity.ok(result);
     }
 
     @Operation(summary = "Update User Company")
@@ -96,7 +103,9 @@ public class CompanyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(companyDetailService.getAllCompanies(pageable));
+        Paginate<CompanyResponseDTO> result = companyDetailService.getAllCompanies(pageable);
+        companyResponseEnricher.enrich(result.getContent());
+        return ResponseEntity.ok(result);
     }
 
     @Operation(summary = "Get companies by user's company identifier")
@@ -106,7 +115,9 @@ public class CompanyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(companyDetailService.getCompaniesByUserIdentifier(companyIdentifier, pageable));
+        Paginate<CompanyResponseDTO> result = companyDetailService.getCompaniesByUserIdentifier(companyIdentifier, pageable);
+        companyResponseEnricher.enrich(result.getContent());
+        return ResponseEntity.ok(result);
     }
 
     @Operation(summary = "Get companies by user ID")
@@ -116,7 +127,18 @@ public class CompanyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(companyDetailService.getCompaniesByUserId(userId, pageable));
+        Paginate<CompanyResponseDTO> result = companyDetailService.getCompaniesByUserId(userId, pageable);
+        companyResponseEnricher.enrich(result.getContent());
+        return ResponseEntity.ok(result);
+    }
+
+    @Operation(summary = "Update a company together with its custom profile values and SMS sender id")
+    @PutMapping("/edit_with_custom_fields/{companyId}")
+    public ResponseEntity<CompanyResponseDTO> editWithCustomFields(
+            @PathVariable Long companyId,
+            @RequestBody LegacyCompanyWriteRequest request) {
+        CompanyResponseDTO updated = companyCompatibilityService.editWithCustomFields(companyId, request);
+        return ResponseEntity.ok(companyResponseEnricher.enrich(updated));
     }
 
 }

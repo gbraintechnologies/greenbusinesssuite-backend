@@ -3,6 +3,7 @@ package com.mesh_suite.service.user;
 
 import com.mesh_suite.dto.Paginate;
 import com.mesh_suite.dto.request.RoleRequest;
+import com.mesh_suite.exception.BadRequestException;
 import com.mesh_suite.exception.ResourceNotFoundException;
 import com.mesh_suite.domain.user.Permission;
 import com.mesh_suite.domain.user.Role;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Set;
@@ -31,6 +34,9 @@ public class RoleService {
 
     @Transactional
     public Long createRoleWithPermissions(RoleRequest request) {
+        if (request.getPermissions() == null || request.getPermissions().isEmpty()) {
+            throw new BadRequestException("At least one permission is required");
+        }
         // Create or get existing permissions
         Set<Permission> permissions = request.getPermissions().stream()
                 .map(permRequest -> {
@@ -86,8 +92,9 @@ public class RoleService {
             role.setDescription(request.getDescription());
         }
 
-        // Process permission changes
-        if (request.getPermissions() != null) {
+        // An empty list means the caller is only renaming the role.
+        // Permission membership is replaced by the dedicated permissions endpoint.
+        if (request.getPermissions() != null && !request.getPermissions().isEmpty()) {
             // Get names of requested permissions
             Set<String> requestedPermissionNames = request.getPermissions().stream()
                     .map(perm -> Permission.buildName(
@@ -129,6 +136,26 @@ public class RoleService {
 
         return RoleRepository.save(role);
     }
+
+    @Transactional
+    public Role replacePermissions(Long roleId, List<Long> permissionIds) {
+        Role role = RoleRepository.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found with ID: " + roleId));
+        Set<Long> requested = new LinkedHashSet<>(permissionIds == null ? List.of() : permissionIds);
+        List<Permission> found = requested.isEmpty()
+                ? List.of()
+                : permissionRepository.findAllById(requested);
+        if (found.size() != requested.size()) {
+            throw new BadRequestException("One or more permissions were not found");
+        }
+        if (role.getPermissions() == null) {
+            role.setPermissions(new HashSet<>());
+        }
+        role.getPermissions().clear();
+        role.getPermissions().addAll(found);
+        return RoleRepository.save(role);
+    }
+
     public Paginate<Role> getAllRoles(int page, int size) {
         Page<Role> roles = RoleRepository.findAll(PageRequest.of(page, size, Sort.by("roleName")));
 

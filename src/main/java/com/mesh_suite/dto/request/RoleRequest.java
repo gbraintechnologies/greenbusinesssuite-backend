@@ -4,7 +4,6 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 
 @Data
@@ -16,6 +15,5 @@ public class RoleRequest {
     private String description;
 
     @Valid
-    @NotEmpty
     private List<PermissionRequest> permissions;
 }

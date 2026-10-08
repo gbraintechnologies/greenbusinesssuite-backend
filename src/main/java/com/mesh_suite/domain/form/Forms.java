@@ -3,6 +3,7 @@ package com.mesh_suite.domain.form;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mesh_suite.interceptor.TenantContext;
 import com.mesh_suite.util.FormUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -103,6 +104,9 @@ public class Forms implements Serializable {
     @Column(name = "redirect_url")
     private String redirectUrl;
 
+    @Column(name = "api_key")
+    private String apiKey;
+
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
@@ -131,5 +135,10 @@ public class Forms implements Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(id); 
+    }
+
+    @JsonProperty("api_key")
+    public String getApi_key() {
+        return apiKey;
     }
 }

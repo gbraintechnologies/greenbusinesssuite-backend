@@ -16,7 +16,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users", uniqueConstraints = {
@@ -57,6 +59,22 @@ public class Users implements UserDetails {
     @Column(nullable = false)
     @JsonIgnore
     private String password;
+
+    @JsonIgnore
+    @Column(name = "temporary_password")
+    private String temporaryPassword;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "user_permissions",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    @JsonIgnore
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<Permission> directPermissions = new HashSet<>();
 
     @Column(nullable = false, name = "profile_image")
     private String profileImage;

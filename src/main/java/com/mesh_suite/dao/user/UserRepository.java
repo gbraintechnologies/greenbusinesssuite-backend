@@ -1,5 +1,6 @@
 package com.mesh_suite.dao.user;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,4 +31,27 @@ public interface UserRepository extends JpaRepository<Users, Long>, JpaSpecifica
     Page<Users> findByStatus(UserStatus status, Pageable pageable);
 
     boolean existsByRole(Role role);
+
+    @Query("""
+            SELECT u FROM Users u
+            WHERE LOWER(COALESCE(u.firstName, '')) LIKE LOWER(CONCAT('%', :word, '%'))
+               OR LOWER(COALESCE(u.lastName, '')) LIKE LOWER(CONCAT('%', :word, '%'))
+               OR LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :word, '%'))
+               OR LOWER(COALESCE(u.username, '')) LIKE LOWER(CONCAT('%', :word, '%'))
+               OR LOWER(CONCAT(COALESCE(u.firstName, ''), ' ', COALESCE(u.lastName, ''))) LIKE LOWER(CONCAT('%', :word, '%'))
+            """)
+    List<Users> searchByWord(@Param("word") String word);
+
+    Optional<Users> findByEmailIgnoreCase(String email);
+
+    long countByStatus(UserStatus status);
+
+    @Query("SELECT COUNT(u) FROM Users u WHERE u.createdOn >= :from")
+    long countCreatedSince(@Param("from") LocalDateTime from);
+
+    @Query("SELECT MONTH(u.createdOn), COUNT(u) FROM Users u WHERE u.createdOn >= :from GROUP BY MONTH(u.createdOn)")
+    List<Object[]> countCreatedByMonthSince(@Param("from") LocalDateTime from);
+
+    @Query("SELECT COUNT(u) FROM Users u WHERE u.isVerified = true")
+    long countVerified();
 }

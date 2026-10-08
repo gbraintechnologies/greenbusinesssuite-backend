@@ -6,6 +6,7 @@ public final class AppConstants {
 
     public static final String[] PUBLIC_PATHS = {
             "/mesh-suite/v1.0/auth/**",
+            "/mesh-suite/v1.0/noauth/**",
             "/mesh-suite/v1.0/forms/builder/**",
             "/mesh-suite/v1.0/categories",
             "/mesh-suite/v1.0/company-branding/**",

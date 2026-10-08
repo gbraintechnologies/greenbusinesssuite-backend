@@ -2,11 +2,15 @@ package com.mesh_suite.controller.user;
 
 import com.mesh_suite.domain.user.Users;
 import com.mesh_suite.dto.request.ChangePasswordRequest;
+import com.mesh_suite.dto.request.LegacyUserWriteRequest;
+import com.mesh_suite.dto.request.PermissionIdsRequest;
 import com.mesh_suite.dto.request.UpdateUserCompanyDTO;
 import com.mesh_suite.dto.request.UserFilterRequest;
 import com.mesh_suite.dto.response.MessageResponse;
 import com.mesh_suite.dto.response.UserResponse;
+import com.mesh_suite.exception.BadRequestException;
 import com.mesh_suite.exception.UnAuthenticatedException;
+import com.mesh_suite.service.user.UserCompatibilityService;
 import com.mesh_suite.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/mesh-suite/v1.0/users")
@@ -30,6 +35,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final UserCompatibilityService userCompatibilityService;
 
     @GetMapping("/me")
     @ResponseStatus(HttpStatus.OK)
@@ -46,11 +52,69 @@ public class UserController {
     @GetMapping("/me/permissions")
     @ResponseStatus(HttpStatus.OK)
     public List<String> getCurrentUserPermissions(@AuthenticationPrincipal Users user) {
-        return user.getRole()
-                .getPermissions()
-                .stream()
-                .map(permission -> permission.getName())
-                .toList();
+        return userCompatibilityService.permissionNames(user.getId());
+    }
+
+    @GetMapping("/search_users/{word:.+}")
+    @ResponseStatus(HttpStatus.OK)
+    public List<UserResponse> searchUsers(@PathVariable String word) {
+        return userCompatibilityService.search(word);
+    }
+
+    @GetMapping("/search_users_by_email/{email:.+}")
+    @ResponseStatus(HttpStatus.OK)
+    public List<UserResponse> searchUsersByEmail(@PathVariable String email) {
+        return userCompatibilityService.searchByEmail(email);
+    }
+
+    @PostMapping("/blacklist/{userId}")
+    public ResponseEntity<MessageResponse> blacklistUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(userCompatibilityService.blacklist(userId));
+    }
+
+    @PostMapping({"/create_with_custom_fields", "/create_with_custom_fields/"})
+    public ResponseEntity<UserResponse> createWithCustomFields(@RequestBody LegacyUserWriteRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userCompatibilityService.createWithCustomFields(request));
+    }
+
+    @PutMapping("/edit_with_custom_fields/{userId}")
+    public ResponseEntity<UserResponse> editWithCustomFields(
+            @PathVariable Long userId,
+            @RequestBody LegacyUserWriteRequest request) {
+        return ResponseEntity.ok(userCompatibilityService.editWithCustomFields(userId, request));
+    }
+
+    @PostMapping({"/get_custom_fields", "/get_custom_fields/"})
+    @ResponseStatus(HttpStatus.OK)
+    public List<Map<String, Object>> getCustomFields() {
+        return userCompatibilityService.customFieldCatalog();
+    }
+
+    @PutMapping("/update/{userId}")
+    public ResponseEntity<UserResponse> updateUser(
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> userData) {
+        return ResponseEntity.ok(userCompatibilityService.update(userId, userData));
+    }
+
+    @PutMapping("/{userId}/permissions")
+    public ResponseEntity<MessageResponse> updateUserPermissions(
+            @PathVariable Long userId,
+            @RequestBody PermissionIdsRequest request) {
+        if (request == null) {
+            throw new BadRequestException("permissionIds is required");
+        }
+        return ResponseEntity.ok(userCompatibilityService.replacePermissions(userId, request.getPermissionIds()));
+    }
+
+    @PostMapping({"/current_logged_in", "/current_logged_in/"})
+    public ResponseEntity<UserResponse> currentLoggedIn(
+            @RequestParam(required = false) String token,
+            @AuthenticationPrincipal Users user) {
+        if (user == null || user.getEmail() == null) {
+            throw new UnAuthenticatedException("Authentication required");
+        }
+        return ResponseEntity.ok(userService.getUserByEmail(user.getEmail(), user));
     }
 
     @GetMapping("/{id}")
