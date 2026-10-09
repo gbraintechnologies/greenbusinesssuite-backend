@@ -75,12 +75,18 @@ compose up -d --remove-orphans
 docker image prune -f
 
 echo "Waiting for backend health..."
+healthy=0
 for i in $(seq 1 "$HEALTH_RETRIES"); do
   if docker exec gbs_backend curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1 \
     || docker exec gbs_backend curl -fsS http://localhost:8081/health >/dev/null 2>&1; then
-    echo "Backend healthy"
-    compose ps
-    exit 0
+    healthy=$((healthy + 1))
+    if [ "$healthy" -ge 3 ]; then
+      echo "Backend healthy"
+      compose ps
+      exit 0
+    fi
+  else
+    healthy=0
   fi
   sleep 5
 done
