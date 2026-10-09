@@ -81,8 +81,12 @@ public class AuthService {
             log.info(" Tenant context set to: {}", requestedTenant);
 
             String loginEmail = loginRequest.getEmail();
-            if (userRepository.findByEmail(loginEmail).isEmpty()) {
+            Boolean greenAccount = greenAccountClient.emailExists(loginEmail);
+            if (Boolean.TRUE.equals(greenAccount) || (greenAccount == null && userRepository.findByEmail(loginEmail).isEmpty())) {
                 Users adopted = adoptGreenAccount(loginRequest);
+                if (Boolean.TRUE.equals(greenAccount) && adopted == null) {
+                    throw new BadCredentialsException("Invalid email or password");
+                }
                 if (adopted != null) {
                     loginEmail = adopted.getEmail();
                 }
@@ -130,7 +134,9 @@ public class AuthService {
                     .build();
 
             log.info(" ===== LOGIN SUCCESSFUL =====");
-            publishGreenAccount(user);
+            if (user.isVerified()) {
+                publishGreenAccount(user);
+            }
             return response;
 
         } catch (BadCredentialsException e) {
@@ -174,6 +180,22 @@ public class AuthService {
     @Transactional
     public MessageResponse register(RegisterRequest registerRequest,  HttpServletRequest request) {
         try {
+            boolean privilegedCaller = callerIsPlatformAdmin();
+            Boolean greenAccount = greenAccountClient.emailExists(registerRequest.getEmail());
+            if (Boolean.TRUE.equals(greenAccount)) {
+                if (privilegedCaller) {
+                    throw new DuplicateResourceException("This email already belongs to a Green Account. Please log in instead.");
+                }
+                Optional<GreenAccountProfile> match = greenAccountClient.authenticate(
+                        registerRequest.getEmail(),
+                        registerRequest.getPassword());
+                if (match.isEmpty()) {
+                    throw new DuplicateResourceException("This email already belongs to a Green Account. Please log in instead.");
+                }
+                adoptGreenAccount(new LoginRequest(match.get().getEmail(), registerRequest.getPassword()));
+                return new MessageResponse("Your Green Account is ready on Green Business Suite. Sign in to continue.");
+            }
+
             if (userRepository.existsByEmail(registerRequest.getEmail())) {
                 throw new DuplicateResourceException("Email is already in use!");
             }
@@ -208,7 +230,9 @@ public class AuthService {
 
 
             userRepository.saveAndFlush(user);
-            publishGreenAccount(user);
+            if (user.isVerified()) {
+                publishGreenAccount(user);
+            }
 
             // Delete any previous tokens for this user
             passwordResetTokenRepository.deleteByUser(user);
@@ -226,6 +250,8 @@ public class AuthService {
                 log.error("Failed to send registration email for user {}: {}", user.getEmail(), emailEx.getMessage(), emailEx);
                 return new MessageResponse("User registered successfully, but email sending failed. Please contact support for assistance.");
             }
+        } catch (DuplicateResourceException e) {
+            throw e;
         } catch (DataIntegrityViolationException e) {
             log.error("Registration failed: {}", e.getMessage(), e);
             throw new RuntimeException("Registration failed due to data constraints: " + e.getMostSpecificCause().getMessage());
@@ -247,6 +273,7 @@ public class AuthService {
 
         user.setVerified(true);
         userRepository.save(user);
+        publishGreenAccount(user);
         return new MessageResponse("Account verified successfully!");
     }
 
@@ -272,7 +299,16 @@ public class AuthService {
         GreenAccountProfile account = match.get();
         Optional<Users> existing = userRepository.findByEmail(account.getEmail());
         if (existing.isPresent()) {
-            return existing.get();
+            Users user = existing.get();
+            user.setPassword(passwordEncoder.encode(loginRequest.getPassword()));
+            if (!StringUtils.hasText(user.getPhoneNumber()) && StringUtils.hasText(account.getPhone())) {
+                user.setPhoneNumber(account.getPhone());
+            }
+            user.setVerified(true);
+            user.setEnabled(true);
+            Users saved = userRepository.saveAndFlush(user);
+            publishGreenAccount(saved);
+            return saved;
         }
 
         String[] names = splitName(account.getDisplayName(), account.getEmail());
@@ -301,6 +337,7 @@ public class AuthService {
                 .build();
         Users saved = userRepository.saveAndFlush(user);
         log.info("Registered Suite user {} from Green account {}", saved.getEmail(), account.getGreenAccountId());
+        publishGreenAccount(saved);
         return saved;
     }
 

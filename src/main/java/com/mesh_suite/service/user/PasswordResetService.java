@@ -53,7 +53,9 @@ public class PasswordResetService {
         String temPass= codeGenerator.generateTemporaryPassword();
         user.setPassword(passwordEncoder.encode(temPass));
         userRepository.save(user);
-        greenAccountClient.provision(user);
+        if (user.isVerified()) {
+            greenAccountClient.provision(user);
+        }
         emailService.sendTemporaryPasswordEmail(user, temPass);
 
         return new MessageResponse("Check your email for a temporary password to log into account setting to request a password change.");
@@ -72,7 +74,9 @@ public class PasswordResetService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
 
         userRepository.save(user);
-        greenAccountClient.provision(user);
+        if (user.isVerified()) {
+            greenAccountClient.provision(user);
+        }
 
         resetToken.setUsed(true);
         passwordResetTokenRepository.save(resetToken);

@@ -50,6 +50,28 @@ public class GreenAccountClient {
         return StringUtils.hasText(baseUrl) && StringUtils.hasText(apiKey);
     }
 
+    public Boolean emailExists(String email) {
+        if (!enabled() || !StringUtils.hasText(email) || !email.contains("@")) {
+            return null;
+        }
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("email", email.trim());
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    baseUrl + "/v1/accounts/lookup",
+                    new HttpEntity<>(body, headers()),
+                    String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return null;
+            }
+            JsonNode root = objectMapper.readTree(response.getBody());
+            return root.path("exists").asBoolean(false);
+        } catch (Exception ex) {
+            log.warn("Green account lookup failed for {}: {}", email, ex.getMessage());
+            return null;
+        }
+    }
+
     public Optional<GreenAccountProfile> authenticate(String email, String password) {
         if (!enabled() || !StringUtils.hasText(email) || !StringUtils.hasText(password)) {
             return Optional.empty();
