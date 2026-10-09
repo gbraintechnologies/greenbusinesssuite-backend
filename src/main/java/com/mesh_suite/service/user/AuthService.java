@@ -17,6 +17,8 @@ import com.mesh_suite.dto.response.MessageResponse;
 import com.mesh_suite.exception.DuplicateResourceException;
 import com.mesh_suite.exception.ResourceNotFoundException;
 import com.mesh_suite.exception.TokenRefreshException;
+import com.mesh_suite.integration.GreenAccountClient;
+import com.mesh_suite.integration.GreenAccountProfile;
 import com.mesh_suite.interceptor.TenantContext;
 import com.mesh_suite.security.JwtTokenProvider;
 import com.mesh_suite.security.MasterTenantValidator;
@@ -39,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,6 +61,7 @@ public class AuthService {
     private final EmailService emailService;
     private final CodeGenerator codeGenerator;
     private final MasterTenantValidator masterTenantValidator;
+    private final GreenAccountClient greenAccountClient;
 
 
     private Role getRole(Long id) {
@@ -74,10 +78,18 @@ public class AuthService {
             TenantContext.setCurrentTenant(requestedTenant);
             log.info(" Tenant context set to: {}", requestedTenant);
 
+            String loginEmail = loginRequest.getEmail();
+            if (userRepository.findByEmail(loginEmail).isEmpty()) {
+                Users adopted = adoptGreenAccount(loginRequest);
+                if (adopted != null) {
+                    loginEmail = adopted.getEmail();
+                }
+            }
+
             log.info(" Attempting authentication...");
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            loginRequest.getEmail(),
+                            loginEmail,
                             loginRequest.getPassword()
                     )
             );
@@ -116,6 +128,7 @@ public class AuthService {
                     .build();
 
             log.info(" ===== LOGIN SUCCESSFUL =====");
+            publishGreenAccount(user);
             return response;
 
         } catch (BadCredentialsException e) {
@@ -193,6 +206,7 @@ public class AuthService {
 
 
             userRepository.saveAndFlush(user);
+            publishGreenAccount(user);
 
             // Delete any previous tokens for this user
             passwordResetTokenRepository.deleteByUser(user);
@@ -244,6 +258,79 @@ public class AuthService {
                 })
                 .orElseThrow(() -> new TokenRefreshException(request.getRefreshToken(),
                         "Refresh token is not found in database!"));
+    }
+
+    private Users adoptGreenAccount(LoginRequest loginRequest) {
+        Optional<GreenAccountProfile> match = greenAccountClient.authenticate(
+                loginRequest.getEmail(),
+                loginRequest.getPassword());
+        if (match.isEmpty()) {
+            return null;
+        }
+        GreenAccountProfile account = match.get();
+        Optional<Users> existing = userRepository.findByEmail(account.getEmail());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        String[] names = splitName(account.getDisplayName(), account.getEmail());
+        String username = account.getEmail();
+        if (userRepository.existsByUsername(username)) {
+            username = account.getEmail() + "." + UUID.randomUUID().toString().substring(0, 8);
+        }
+        Role role = memberRole();
+        String tenantId = TenantContext.getCurrentTenant();
+        Users user = Users.builder()
+                .firstName(names[0])
+                .lastName(names[1])
+                .username(username)
+                .email(account.getEmail())
+                .password(passwordEncoder.encode(loginRequest.getPassword()))
+                .phoneNumber(StringUtils.hasText(account.getPhone()) ? account.getPhone() : null)
+                .profileImage("")
+                .status(UserStatus.ACTIVE)
+                .role(role)
+                .roleName(role.getRoleName())
+                .companyIdentifier(tenantId)
+                .tenantId(tenantId)
+                .enabled(true)
+                .isVerified(true)
+                .createdOn(LocalDateTime.now())
+                .build();
+        Users saved = userRepository.saveAndFlush(user);
+        log.info("Registered Suite user {} from Green account {}", saved.getEmail(), account.getGreenAccountId());
+        return saved;
+    }
+
+    private Role memberRole() {
+        return userRoleRepository.findByRoleName("USER")
+                .orElseGet(() -> userRoleRepository.save(Role.builder()
+                        .roleName("USER")
+                        .description("Signed in with a Green account")
+                        .tenantId(TenantContext.getCurrentTenant())
+                        .permissions(new HashSet<>())
+                        .build()));
+    }
+
+    private void publishGreenAccount(Users user) {
+        try {
+            greenAccountClient.provision(user);
+        } catch (RuntimeException ex) {
+            log.warn("Green account publish failed for {}: {}", user.getEmail(), ex.getMessage());
+        }
+    }
+
+    private static String[] splitName(String displayName, String email) {
+        String source = StringUtils.hasText(displayName) ? displayName.trim() : email;
+        int space = source.indexOf(' ');
+        if (space < 0) {
+            return new String[]{source, "Account"};
+        }
+        String last = source.substring(space + 1).trim();
+        if (!StringUtils.hasText(last)) {
+            last = "Account";
+        }
+        return new String[]{source.substring(0, space), last};
     }
 
     private String generateRandomPassword() {

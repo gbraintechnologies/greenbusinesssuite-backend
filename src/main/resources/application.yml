@@ -88,6 +88,12 @@ storage:
     bucket-name: ${AWS_BUCKET_NAME:mbs}
     endpoint: ${AWS_ENDPOINT:https://usc1.contabostorage.com}
 
+# Shared Green account. Empty values leave Suite on its own user table.
+green:
+  account:
+    url: ${GREEN_ACCOUNT_URL:}
+    api-key: ${GREEN_ACCOUNT_API_KEY:}
+
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET}

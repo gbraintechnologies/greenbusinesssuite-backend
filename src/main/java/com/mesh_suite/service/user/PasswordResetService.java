@@ -8,6 +8,7 @@ import com.mesh_suite.dto.request.ForgotPasswordRequest;
 import com.mesh_suite.dto.request.ResetPasswordRequest;
 import com.mesh_suite.dto.response.MessageResponse;
 import com.mesh_suite.exception.ResourceNotFoundException;
+import com.mesh_suite.integration.GreenAccountClient;
 import com.mesh_suite.exception.UnAuthenticatedException;
 import com.mesh_suite.service.notify.EmailService;
 import com.mesh_suite.util.CodeGenerator;
@@ -30,6 +31,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final CodeGenerator codeGenerator;
+    private final GreenAccountClient greenAccountClient;
 
     @Transactional
     public MessageResponse requestPasswordReset(ForgotPasswordRequest request) {
@@ -51,6 +53,7 @@ public class PasswordResetService {
         String temPass= codeGenerator.generateTemporaryPassword();
         user.setPassword(passwordEncoder.encode(temPass));
         userRepository.save(user);
+        greenAccountClient.provision(user);
         emailService.sendTemporaryPasswordEmail(user, temPass);
 
         return new MessageResponse("Check your email for a temporary password to log into account setting to request a password change.");
@@ -69,6 +72,7 @@ public class PasswordResetService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
 
         userRepository.save(user);
+        greenAccountClient.provision(user);
 
         resetToken.setUsed(true);
         passwordResetTokenRepository.save(resetToken);
