@@ -32,6 +32,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -180,7 +182,7 @@ public class AuthService {
                 throw new DuplicateResourceException("Username is already in use!");
             }
 
-            Role userRole = getRole(registerRequest.getRoleId());
+            Role userRole = resolveSignupRole(registerRequest.getRoleId());
             boolean isPrivilegedUser = isPrivilegedRole(userRole.getRoleName());
 
             String rawPassword = isPrivilegedUser
@@ -300,6 +302,24 @@ public class AuthService {
         Users saved = userRepository.saveAndFlush(user);
         log.info("Registered Suite user {} from Green account {}", saved.getEmail(), account.getGreenAccountId());
         return saved;
+    }
+
+    private Role resolveSignupRole(Long requestedRoleId) {
+        if (callerIsPlatformAdmin() && requestedRoleId != null) {
+            return getRole(requestedRoleId);
+        }
+        return memberRole();
+    }
+
+    private boolean callerIsPlatformAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        return authentication.getAuthorities().stream().anyMatch(authority -> {
+            String role = authority.getAuthority();
+            return "ROLE_SUPERADMIN".equals(role) || "ROLE_APEX".equals(role);
+        });
     }
 
     private Role memberRole() {
