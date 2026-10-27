@@ -199,12 +199,13 @@ public class DataInitializer implements CommandLineRunner {
         log.info("📌 Creating roles with permissions...");
 
         try {
+            TenantContext.setCurrentTenant(AppConstants.DEFAULT_TENANT_ID);
             List<String> roleNames = Arrays.asList("APEX", "SUPERADMIN", "ADMIN");
             List<Permission> allPermissions = permissionRepository.findAll();
 
             int createdCount = 0;
             for (String roleName : roleNames) {
-                if (roleRepository.findByRoleName(roleName).isPresent()) {
+                if (roleRepository.findByRoleNameAndTenantId(roleName, AppConstants.DEFAULT_TENANT_ID).isPresent()) {
                     log.info("Role '{}' already exists, skipping", roleName);
                     continue;
                 }
@@ -212,6 +213,7 @@ public class DataInitializer implements CommandLineRunner {
                 Role role = Role.builder()
                         .roleName(roleName)
                         .description(getRoleDescription(roleName))
+                        .tenantId(AppConstants.DEFAULT_TENANT_ID)
                         .createdAt(LocalDateTime.now())
                         .permissions(new HashSet<>(allPermissions))
                         .build();
@@ -226,6 +228,8 @@ public class DataInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.error("❌ Failed to initialize roles: {}", e.getMessage(), e);
             throw new RuntimeException("Role initialization failed", e);
+        } finally {
+            TenantContext.clear();
         }
     }
 
@@ -239,7 +243,7 @@ public class DataInitializer implements CommandLineRunner {
             TenantContext.setCurrentTenant(AppConstants.DEFAULT_TENANT_ID);
 
             if (!userRepository.existsByEmail(apexEmail)) {
-                Role apexRole = roleRepository.findByRoleName("APEX")
+                Role apexRole = roleRepository.findByRoleNameAndTenantId("APEX", AppConstants.DEFAULT_TENANT_ID)
                         .orElseThrow(() -> new RuntimeException("APEX role not found"));
 
                 Users apexUser = Users.builder()
@@ -277,7 +281,7 @@ public class DataInitializer implements CommandLineRunner {
         log.info("📌 Ensuring APEX role has all permissions...");
 
         try {
-            Role apexRole = roleRepository.findByRoleName("APEX")
+            Role apexRole = roleRepository.findByRoleNameAndTenantId("APEX", AppConstants.DEFAULT_TENANT_ID)
                     .orElseThrow(() -> new RuntimeException("APEX role not found"));
 
             List<Permission> allPermissions = permissionRepository.findAll();

@@ -85,7 +85,13 @@ public class AuthService {
             if (Boolean.TRUE.equals(greenAccount) || (greenAccount == null && userRepository.findByEmail(loginEmail).isEmpty())) {
                 Users adopted = adoptGreenAccount(loginRequest);
                 if (Boolean.TRUE.equals(greenAccount) && adopted == null) {
-                    throw new BadCredentialsException("Invalid email or password");
+                    // Email exists in Green Account but password did not match there.
+                    // If this tenant already has a local Suite user, fall through to local auth
+                    // so company-dashboard credentials still work.
+                    if (userRepository.findByEmail(loginEmail).isEmpty()) {
+                        throw new BadCredentialsException("Invalid email or password");
+                    }
+                    log.info("Green account auth failed for {}; falling back to local credentials", loginEmail);
                 }
                 if (adopted != null) {
                     loginEmail = adopted.getEmail();
@@ -360,11 +366,13 @@ public class AuthService {
     }
 
     private Role memberRole() {
-        return userRoleRepository.findByRoleName("USER")
+        String tenantId = TenantContext.getCurrentTenant();
+        return userRoleRepository.findByRoleNameAndTenantId("USER", tenantId)
+                .or(() -> userRoleRepository.findByRoleNameAndTenantId("CLIENT", tenantId))
                 .orElseGet(() -> userRoleRepository.save(Role.builder()
                         .roleName("USER")
                         .description("Signed in with a Green account")
-                        .tenantId(TenantContext.getCurrentTenant())
+                        .tenantId(tenantId)
                         .permissions(new HashSet<>())
                         .build()));
     }

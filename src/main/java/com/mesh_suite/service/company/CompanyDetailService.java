@@ -147,11 +147,11 @@ public class CompanyDetailService {
 
     public MessageResponse assignTenantAdmin(CreateUserRequest request) {
         try {
-            Role adminRole = roleRepository.findByRoleName("ADMIN")
-                    .orElseThrow(() -> new ResourceNotFoundException("Admin role not found"));
+            String tenantId = TenantContext.getCurrentTenant();
+            Role adminRole = roleRepository.findByRoleNameAndTenantId("ADMIN", tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Admin role not found for tenant: " + tenantId));
 
             String rawPassword = codeGenerator.generateTemporaryPassword();
-            String tenantId = TenantContext.getCurrentTenant();
 
             Users user = Users.builder()
                     .firstName(request.getFirstName())
