@@ -32,6 +32,10 @@ public class GeaProgramRecord {
     @Column(name = "external_key", length = 256)
     private String externalKey;
 
+    /** Normalized Ghana phone (9 digits) — unique business identity for dedupe. */
+    @Column(length = 32)
+    private String phone;
+
     @Column(length = 32)
     private String gender;
 

@@ -2,10 +2,12 @@ package com.mesh_suite.service.form;
 
 import com.mesh_suite.constant.forms.UserStatus;
 import com.mesh_suite.constant.shared.AppConstants;
+import com.mesh_suite.dao.analytics.GeaAnalyticsStatRepository;
 import com.mesh_suite.dao.analytics.GeaProgramRecordRepository;
 import com.mesh_suite.dao.analytics.GeaProgramRepository;
 import com.mesh_suite.dao.company.BusinessProfileRepository;
 import com.mesh_suite.dao.user.UserRepository;
+import com.mesh_suite.domain.analytics.GeaAnalyticsStat;
 import com.mesh_suite.domain.analytics.GeaProgram;
 import com.mesh_suite.dto.response.AnalyticsPayload;
 import com.mesh_suite.dto.response.AnalyticsPayload.KpiValue;
@@ -26,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 @Service
@@ -34,12 +37,16 @@ public class AnalyticsService {
     private static final String LOAN_GRANT = "loan_grant";
     private static final String TRAINING = "training";
     private static final String BUSINESS = "business";
+    private static final String GENERAL = "general";
     private static final List<String> GENERAL_BUSINESS_TYPES = List.of(LOAN_GRANT, BUSINESS);
+    private static final long CACHE_TTL_MS = 30 * 60 * 1000L;
 
     private final BusinessProfileRepository businessProfileRepository;
     private final UserRepository userRepository;
     private final GeaProgramRepository geaProgramRepository;
     private final GeaProgramRecordRepository geaProgramRecordRepository;
+    private final GeaAnalyticsStatRepository geaAnalyticsStatRepository;
+    private final ConcurrentHashMap<String, CacheEntry> responseCache = new ConcurrentHashMap<>();
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -48,28 +55,33 @@ public class AnalyticsService {
             BusinessProfileRepository businessProfileRepository,
             UserRepository userRepository,
             GeaProgramRepository geaProgramRepository,
-            GeaProgramRecordRepository geaProgramRecordRepository) {
+            GeaProgramRecordRepository geaProgramRecordRepository,
+            GeaAnalyticsStatRepository geaAnalyticsStatRepository) {
         this.businessProfileRepository = businessProfileRepository;
         this.userRepository = userRepository;
         this.geaProgramRepository = geaProgramRepository;
         this.geaProgramRecordRepository = geaProgramRecordRepository;
+        this.geaAnalyticsStatRepository = geaAnalyticsStatRepository;
     }
 
     public AnalyticsPayload generalBusiness() {
-        return unscopedIfPlatform(() -> {
-            long geaTotal = geaProgramRecordRepository.countByRecordTypes(GENERAL_BUSINESS_TYPES);
+        return cached("general-business", () -> unscopedIfPlatform(() -> {
+            AnalyticsPayload fromStats = fromGeneralStats();
+            if (fromStats != null) {
+                return fromStats;
+            }
+
+            long geaTotal = geaProgramRecordRepository.countDistinctBusinesses(GENERAL_BUSINESS_TYPES);
             if (geaTotal > 0) {
                 return AnalyticsPayload.builder()
-                        .kpis(List.of(
-                                new KpiValue("Total businesses", geaTotal, false)
-                        ))
-                        .registered(namedCounts(geaProgramRecordRepository.countByRegisteredTypes(GENERAL_BUSINESS_TYPES)))
-                        .gender(namedCounts(geaProgramRecordRepository.countByGenderTypes(GENERAL_BUSINESS_TYPES)))
-                        .regions(namedCounts(geaProgramRecordRepository.countByRegionTypes(GENERAL_BUSINESS_TYPES)))
-                        .sectors(namedCounts(geaProgramRecordRepository.countBySectorTypes(GENERAL_BUSINESS_TYPES)))
-                        .disability(namedCounts(geaProgramRecordRepository.countByDisabilityTypes(GENERAL_BUSINESS_TYPES)))
-                        .ownershipAge(namedCounts(geaProgramRecordRepository.countByAgeBandTypes(GENERAL_BUSINESS_TYPES)))
-                        .literacy(namedCounts(geaProgramRecordRepository.countByLiteracyTypes(GENERAL_BUSINESS_TYPES)))
+                        .kpis(List.of(new KpiValue("Total businesses", geaTotal, false)))
+                        .registered(namedCounts(geaProgramRecordRepository.countDistinctByRegisteredTypes(GENERAL_BUSINESS_TYPES)))
+                        .gender(namedCounts(geaProgramRecordRepository.countDistinctByGenderTypes(GENERAL_BUSINESS_TYPES)))
+                        .regions(namedCounts(geaProgramRecordRepository.countDistinctByRegionTypes(GENERAL_BUSINESS_TYPES)))
+                        .sectors(namedCounts(geaProgramRecordRepository.countDistinctBySectorTypes(GENERAL_BUSINESS_TYPES)))
+                        .disability(namedCounts(geaProgramRecordRepository.countDistinctByDisabilityTypes(GENERAL_BUSINESS_TYPES)))
+                        .ownershipAge(namedCounts(geaProgramRecordRepository.countDistinctByAgeBandTypes(GENERAL_BUSINESS_TYPES)))
+                        .literacy(namedCounts(geaProgramRecordRepository.countDistinctByLiteracyTypes(GENERAL_BUSINESS_TYPES)))
                         .build();
             }
 
@@ -77,9 +89,7 @@ public class AnalyticsService {
             long registered = businessProfileRepository.countRegistered();
             long nonRegistered = Math.max(0, total - registered);
             return AnalyticsPayload.builder()
-                    .kpis(List.of(
-                            new KpiValue("Total businesses", total, false)
-                    ))
+                    .kpis(List.of(new KpiValue("Total businesses", total, false)))
                     .registered(List.of(
                             new NamedCount("Registered", registered),
                             new NamedCount("Non-registered", nonRegistered)
@@ -91,47 +101,59 @@ public class AnalyticsService {
                     .ownershipAge(List.of())
                     .literacy(List.of())
                     .build();
-        });
+        }));
     }
 
     public AnalyticsPayload loansAndGrants(String programId) {
         String pid = normalizeProgramId(programId);
-        return AnalyticsPayload.builder()
-                .programs(programOptions(LOAN_GRANT))
-                .kpis(List.of(
-                        new KpiValue("Total beneficiaries",
-                                geaProgramRecordRepository.countForProgram(LOAN_GRANT, pid), false),
-                        new KpiValue("Total disbursed",
-                                toLongAmount(geaProgramRecordRepository.sumApproved(LOAN_GRANT, pid)), true)
-                ))
-                .registered(namedCounts(geaProgramRecordRepository.countByRegistered(LOAN_GRANT, pid)))
-                .gender(namedCounts(geaProgramRecordRepository.countByGender(LOAN_GRANT, pid)))
-                .regions(namedCounts(geaProgramRecordRepository.countByRegion(LOAN_GRANT, pid)))
-                .sectors(namedCounts(geaProgramRecordRepository.countBySector(LOAN_GRANT, pid)))
-                .disability(namedCounts(geaProgramRecordRepository.countByDisability(LOAN_GRANT, pid)))
-                .age(namedCounts(geaProgramRecordRepository.countByAgeBand(LOAN_GRANT, pid)))
-                .build();
+        return cached("loans-grants:" + pid, () -> {
+            AnalyticsPayload fromStats = fromProgramStats(LOAN_GRANT, pid, true);
+            if (fromStats != null) {
+                return fromStats;
+            }
+            return AnalyticsPayload.builder()
+                    .programs(programOptions(LOAN_GRANT))
+                    .kpis(List.of(
+                            new KpiValue("Total beneficiaries",
+                                    geaProgramRecordRepository.countDistinctForProgram(LOAN_GRANT, pid), false),
+                            new KpiValue("Total disbursed",
+                                    toLongAmount(geaProgramRecordRepository.sumApproved(LOAN_GRANT, pid)), true)
+                    ))
+                    .registered(namedCounts(geaProgramRecordRepository.countDistinctByRegistered(LOAN_GRANT, pid)))
+                    .gender(namedCounts(geaProgramRecordRepository.countDistinctByGender(LOAN_GRANT, pid)))
+                    .regions(namedCounts(geaProgramRecordRepository.countDistinctByRegion(LOAN_GRANT, pid)))
+                    .sectors(namedCounts(geaProgramRecordRepository.countDistinctBySector(LOAN_GRANT, pid)))
+                    .disability(namedCounts(geaProgramRecordRepository.countDistinctByDisability(LOAN_GRANT, pid)))
+                    .age(namedCounts(geaProgramRecordRepository.countDistinctByAgeBand(LOAN_GRANT, pid)))
+                    .build();
+        });
     }
 
     public AnalyticsPayload training(String programId) {
         String pid = normalizeProgramId(programId);
-        return AnalyticsPayload.builder()
-                .programs(programOptions(TRAINING))
-                .kpis(List.of(
-                        new KpiValue("Total trainees",
-                                geaProgramRecordRepository.countForProgram(TRAINING, pid), false)
-                ))
-                .registered(namedCounts(geaProgramRecordRepository.countByRegistered(TRAINING, pid)))
-                .gender(namedCounts(geaProgramRecordRepository.countByGender(TRAINING, pid)))
-                .regions(namedCounts(geaProgramRecordRepository.countByRegion(TRAINING, pid)))
-                .sectors(namedCounts(geaProgramRecordRepository.countBySector(TRAINING, pid)))
-                .disability(namedCounts(geaProgramRecordRepository.countByDisability(TRAINING, pid)))
-                .age(namedCounts(geaProgramRecordRepository.countByAgeBand(TRAINING, pid)))
-                .build();
+        return cached("training:" + pid, () -> {
+            AnalyticsPayload fromStats = fromProgramStats(TRAINING, pid, false);
+            if (fromStats != null) {
+                return fromStats;
+            }
+            return AnalyticsPayload.builder()
+                    .programs(programOptions(TRAINING))
+                    .kpis(List.of(
+                            new KpiValue("Total trainees",
+                                    geaProgramRecordRepository.countDistinctForProgram(TRAINING, pid), false)
+                    ))
+                    .registered(namedCounts(geaProgramRecordRepository.countDistinctByRegistered(TRAINING, pid)))
+                    .gender(namedCounts(geaProgramRecordRepository.countDistinctByGender(TRAINING, pid)))
+                    .regions(namedCounts(geaProgramRecordRepository.countDistinctByRegion(TRAINING, pid)))
+                    .sectors(namedCounts(geaProgramRecordRepository.countDistinctBySector(TRAINING, pid)))
+                    .disability(namedCounts(geaProgramRecordRepository.countDistinctByDisability(TRAINING, pid)))
+                    .age(namedCounts(geaProgramRecordRepository.countDistinctByAgeBand(TRAINING, pid)))
+                    .build();
+        });
     }
 
     public AnalyticsPayload clients() {
-        return unscopedIfPlatform(() -> {
+        return cached("clients", () -> unscopedIfPlatform(() -> {
             long total = userRepository.count();
             long active = userRepository.countByStatus(UserStatus.ACTIVE);
             long nonActive = Math.max(0, total - active);
@@ -158,7 +180,85 @@ public class AnalyticsService {
                     .sectors(namedCounts(businessProfileRepository.countBySector()))
                     .monthwise(monthwiseClients())
                     .build();
-        });
+        }));
+    }
+
+    private AnalyticsPayload fromGeneralStats() {
+        if (!geaAnalyticsStatRepository.existsByScope(GENERAL)) {
+            return null;
+        }
+        List<GeaAnalyticsStat> rows = geaAnalyticsStatRepository.findByScopeAndProgramIdOrderByValueDesc(GENERAL, "all");
+        if (rows.isEmpty()) {
+            return null;
+        }
+        long total = scalar(rows, "total");
+        return AnalyticsPayload.builder()
+                .kpis(List.of(new KpiValue("Total businesses", total, false)))
+                .registered(dimension(rows, "registered"))
+                .gender(dimension(rows, "gender"))
+                .regions(dimension(rows, "region"))
+                .sectors(dimension(rows, "sector"))
+                .disability(dimension(rows, "disability"))
+                .ownershipAge(dimension(rows, "age"))
+                .literacy(dimension(rows, "literacy"))
+                .build();
+    }
+
+    private AnalyticsPayload fromProgramStats(String scope, String programId, boolean includeDisbursed) {
+        if (!geaAnalyticsStatRepository.existsByScope(scope)) {
+            return null;
+        }
+        List<GeaAnalyticsStat> rows = geaAnalyticsStatRepository.findByScopeAndProgramIdOrderByValueDesc(scope, programId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        List<KpiValue> kpis = new ArrayList<>();
+        String totalLabel = LOAN_GRANT.equals(scope) ? "Total beneficiaries" : "Total trainees";
+        kpis.add(new KpiValue(totalLabel, scalar(rows, "total"), false));
+        if (includeDisbursed) {
+            kpis.add(new KpiValue("Total disbursed", scalar(rows, "disbursed"), true));
+        }
+        return AnalyticsPayload.builder()
+                .programs(programOptions(scope))
+                .kpis(kpis)
+                .registered(dimension(rows, "registered"))
+                .gender(dimension(rows, "gender"))
+                .regions(dimension(rows, "region"))
+                .sectors(dimension(rows, "sector"))
+                .disability(dimension(rows, "disability"))
+                .age(dimension(rows, "age"))
+                .build();
+    }
+
+    private long scalar(List<GeaAnalyticsStat> rows, String dimension) {
+        return rows.stream()
+                .filter(r -> dimension.equals(r.getDimension()))
+                .map(GeaAnalyticsStat::getValue)
+                .findFirst()
+                .map(this::toLongAmount)
+                .orElse(0L);
+    }
+
+    private List<NamedCount> dimension(List<GeaAnalyticsStat> rows, String dimension) {
+        List<NamedCount> counts = new ArrayList<>();
+        for (GeaAnalyticsStat row : rows) {
+            if (!dimension.equals(row.getDimension())) {
+                continue;
+            }
+            counts.add(new NamedCount(label(row.getName()), toLongAmount(row.getValue())));
+        }
+        return counts;
+    }
+
+    private AnalyticsPayload cached(String key, Supplier<AnalyticsPayload> loader) {
+        CacheEntry existing = responseCache.get(key);
+        long now = System.currentTimeMillis();
+        if (existing != null && now - existing.loadedAtMs < CACHE_TTL_MS) {
+            return existing.payload;
+        }
+        AnalyticsPayload payload = loader.get();
+        responseCache.put(key, new CacheEntry(payload, now));
+        return payload;
     }
 
     private List<ProgramOption> programOptions(String kind) {
@@ -223,7 +323,6 @@ public class AnalyticsService {
         if (raw.isEmpty()) {
             return "Other / undisclosed";
         }
-        // Preserve already-title-cased analytics labels from ETL
         if (raw.contains("–") || raw.contains("/") || Character.isUpperCase(raw.charAt(0))) {
             return raw;
         }
@@ -258,5 +357,8 @@ public class AnalyticsService {
                 session.enableFilter("tenantFilter").setParameter("tenantId", tenant);
             }
         }
+    }
+
+    private record CacheEntry(AnalyticsPayload payload, long loadedAtMs) {
     }
 }
