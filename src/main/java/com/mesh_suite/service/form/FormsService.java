@@ -210,6 +210,7 @@ public class FormsService {
         existingForm.setCompanyId(updatedForm.getCompanyId());
         existingForm.setUrl(updatedForm.getUrl());
         existingForm.setDescription(updatedForm.getDescription());
+        existingForm.setServiceCategory(updatedForm.getServiceCategory());
         existingForm.setFormInstruction(updatedForm.getFormInstruction());
         existingForm.setUserMandatory(updatedForm.getUserMandatory());
         existingForm.setDeadline(updatedForm.getDeadline());
