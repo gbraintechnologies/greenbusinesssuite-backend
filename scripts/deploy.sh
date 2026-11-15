@@ -78,7 +78,13 @@ if [ "$BUILD_NO_CACHE" = "true" ]; then
 fi
 
 compose build "${BUILD_ARGS[@]}"
-compose up -d --remove-orphans
+
+# Clear leftover recreate containers that block container_name: gbs_backend
+docker ps -a --format '{{.ID}} {{.Names}}' \
+  | awk '/gbs_backend/ {print $1}' \
+  | xargs -r docker rm -f 2>/dev/null || true
+
+compose up -d --remove-orphans --force-recreate
 docker image prune -f
 
 echo "Waiting for backend health..."
