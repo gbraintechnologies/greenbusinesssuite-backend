@@ -6,6 +6,7 @@ import com.mesh_suite.dto.Paginate;
 import com.mesh_suite.dto.request.*;
 import com.mesh_suite.dto.response.CompanyResponseDTO;
 import com.mesh_suite.dto.response.MessageResponse;
+import com.mesh_suite.dto.response.UserResponse;
 import com.mesh_suite.dto.request.LegacyCompanyWriteRequest;
 import com.mesh_suite.service.company.CompanyCompatibilityService;
 import com.mesh_suite.service.company.CompanyDetailService;
@@ -23,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.UnsupportedEncodingException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/mesh-suite/v1.0/companies")
@@ -108,6 +110,18 @@ public class CompanyController {
     public ResponseEntity<MessageResponse> assignTenantAdmin( @Valid @RequestBody CreateUserRequest request) {
         MessageResponse response = companyDetailService.assignTenantAdmin(request);
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "List company administrators by company identifier")
+    @GetMapping("/identifier/{identifier}/admins")
+    public ResponseEntity<List<UserResponse>> listCompanyAdmins(@PathVariable String identifier) {
+        return ResponseEntity.ok(companyDetailService.listCompanyAdmins(identifier));
+    }
+
+    @Operation(summary = "List company clients (Green Account customers) by company identifier")
+    @GetMapping("/identifier/{identifier}/clients")
+    public ResponseEntity<List<UserResponse>> listCompanyClients(@PathVariable String identifier) {
+        return ResponseEntity.ok(companyDetailService.listCompanyClients(identifier));
     }
 
     // In CompanyController.java

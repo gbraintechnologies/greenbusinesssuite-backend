@@ -3,6 +3,13 @@
 # Mirrors the frontend/autobus-web flow: pull, ensure Docker network, build, up.
 set -euo pipefail
 
+LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/gbs-backend-deploy.lock}"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Another backend deploy is already running (lock: $LOCK_FILE). Aborting." >&2
+  exit 1
+fi
+
 BRANCH="${DEPLOY_BRANCH:-main}"
 BUILD_NO_CACHE="${BUILD_NO_CACHE:-false}"
 PULL_IMAGES="${PULL_IMAGES:-true}"

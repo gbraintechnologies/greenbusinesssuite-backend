@@ -54,4 +54,20 @@ public interface UserRepository extends JpaRepository<Users, Long>, JpaSpecifica
 
     @Query("SELECT COUNT(u) FROM Users u WHERE u.isVerified = true")
     long countVerified();
+
+    @Query("""
+            SELECT u FROM Users u
+            WHERE u.companyIdentifier = :companyIdentifier
+              AND LOWER(u.roleName) = 'admin'
+            ORDER BY u.id ASC
+            """)
+    List<Users> findAdminsByCompanyIdentifier(@Param("companyIdentifier") String companyIdentifier);
+
+    @Query("""
+            SELECT u FROM Users u
+            WHERE u.companyIdentifier = :companyIdentifier
+              AND LOWER(COALESCE(u.roleName, '')) NOT IN ('admin', 'superadmin', 'apex', 'super')
+            ORDER BY u.id ASC
+            """)
+    List<Users> findClientsByCompanyIdentifier(@Param("companyIdentifier") String companyIdentifier);
 }

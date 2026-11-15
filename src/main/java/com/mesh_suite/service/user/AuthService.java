@@ -187,6 +187,11 @@ public class AuthService {
     public MessageResponse register(RegisterRequest registerRequest,  HttpServletRequest request) {
         try {
             boolean privilegedCaller = callerIsPlatformAdmin();
+            String companyTenant = resolveCompanyTenant(registerRequest.getCompanyIdentifier(), request);
+            if (StringUtils.hasText(companyTenant)) {
+                TenantContext.setCurrentTenant(companyTenant);
+            }
+
             Boolean greenAccount = greenAccountClient.emailExists(registerRequest.getEmail());
             if (Boolean.TRUE.equals(greenAccount)) {
                 if (privilegedCaller) {
@@ -198,7 +203,9 @@ public class AuthService {
                 if (match.isEmpty()) {
                     throw new DuplicateResourceException("This email already belongs to a Green Account. Please log in instead.");
                 }
-                adoptGreenAccount(new LoginRequest(match.get().getEmail(), registerRequest.getPassword()));
+                adoptGreenAccount(
+                        new LoginRequest(match.get().getEmail(), registerRequest.getPassword()),
+                        companyTenant);
                 return new MessageResponse("Your Green Account is ready on Green Business Suite. Sign in to continue.");
             }
 
@@ -217,6 +224,10 @@ public class AuthService {
                     ? codeGenerator.generateTemporaryPassword()
                     : registerRequest.getPassword();
 
+            String tenantId = StringUtils.hasText(companyTenant)
+                    ? companyTenant
+                    : TenantContext.getCurrentTenant();
+
             Users user = Users.builder()
                     .firstName(registerRequest.getFirstName())
                     .lastName(registerRequest.getLastName())
@@ -225,7 +236,8 @@ public class AuthService {
                     .password(passwordEncoder.encode(rawPassword))
                     .roleName(userRole.getRoleName())
                     .role(userRole)
-                    .companyIdentifier(registerRequest.getCompanyIdentifier())
+                    .companyIdentifier(tenantId)
+                    .tenantId(tenantId)
                     .profileImage(registerRequest.getProfile_image())
                     .phoneNumber(registerRequest.getPhone())
                     .status(registerRequest.getStatus() != null ? registerRequest.getStatus() : UserStatus.ACTIVE)
@@ -296,6 +308,10 @@ public class AuthService {
     }
 
     private Users adoptGreenAccount(LoginRequest loginRequest) {
+        return adoptGreenAccount(loginRequest, TenantContext.getCurrentTenant());
+    }
+
+    private Users adoptGreenAccount(LoginRequest loginRequest, String companyTenant) {
         Optional<GreenAccountProfile> match = greenAccountClient.authenticate(
                 loginRequest.getEmail(),
                 loginRequest.getPassword());
@@ -303,12 +319,26 @@ public class AuthService {
             return null;
         }
         GreenAccountProfile account = match.get();
+        String tenantId = StringUtils.hasText(companyTenant)
+                ? companyTenant.trim()
+                : TenantContext.getCurrentTenant();
+        if (StringUtils.hasText(tenantId)) {
+            TenantContext.setCurrentTenant(tenantId);
+        }
+
         Optional<Users> existing = userRepository.findByEmail(account.getEmail());
         if (existing.isPresent()) {
             Users user = existing.get();
             user.setPassword(passwordEncoder.encode(loginRequest.getPassword()));
             if (!StringUtils.hasText(user.getPhoneNumber()) && StringUtils.hasText(account.getPhone())) {
                 user.setPhoneNumber(account.getPhone());
+            }
+            if (StringUtils.hasText(tenantId)
+                    && !isPrivilegedRole(user.getRoleName())
+                    && (!StringUtils.hasText(user.getCompanyIdentifier())
+                        || AppConstants.DEFAULT_TENANT_ID.equals(user.getCompanyIdentifier()))) {
+                user.setCompanyIdentifier(tenantId);
+                user.setTenantId(tenantId);
             }
             user.setVerified(true);
             user.setEnabled(true);
@@ -323,7 +353,6 @@ public class AuthService {
             username = account.getEmail() + "." + UUID.randomUUID().toString().substring(0, 8);
         }
         Role role = memberRole();
-        String tenantId = TenantContext.getCurrentTenant();
         Users user = Users.builder()
                 .firstName(names[0])
                 .lastName(names[1])
@@ -347,6 +376,18 @@ public class AuthService {
         return saved;
     }
 
+    private String resolveCompanyTenant(String companyIdentifier, HttpServletRequest request) {
+        if (StringUtils.hasText(companyIdentifier)) {
+            return companyIdentifier.trim();
+        }
+        String headerTenant = request != null ? request.getHeader("tenantid") : null;
+        if (StringUtils.hasText(headerTenant)
+                && !AppConstants.DEFAULT_TENANT_ID.equalsIgnoreCase(headerTenant.trim())) {
+            return headerTenant.trim();
+        }
+        return null;
+    }
+
     private Role resolveSignupRole(Long requestedRoleId) {
         if (callerIsPlatformAdmin() && requestedRoleId != null) {
             return getRole(requestedRoleId);
@@ -367,11 +408,12 @@ public class AuthService {
 
     private Role memberRole() {
         String tenantId = TenantContext.getCurrentTenant();
-        return userRoleRepository.findByRoleNameAndTenantId("USER", tenantId)
-                .or(() -> userRoleRepository.findByRoleNameAndTenantId("CLIENT", tenantId))
+        // Company tenants provision CLIENT; prefer that for Green Account customers.
+        return userRoleRepository.findByRoleNameAndTenantId("CLIENT", tenantId)
+                .or(() -> userRoleRepository.findByRoleNameAndTenantId("USER", tenantId))
                 .orElseGet(() -> userRoleRepository.save(Role.builder()
-                        .roleName("USER")
-                        .description("Signed in with a Green account")
+                        .roleName("CLIENT")
+                        .description("Green Account customer")
                         .tenantId(tenantId)
                         .permissions(new HashSet<>())
                         .build()));
@@ -406,6 +448,10 @@ public class AuthService {
      * Helper method to determine privileged roles.
      */
     private boolean isPrivilegedRole(String roleName) {
-        return List.of("SUPERADMIN", "SUPER", "ADMIN").contains(roleName.toUpperCase());
+        if (!StringUtils.hasText(roleName)) {
+            return false;
+        }
+        return List.of("SUPERADMIN", "SUPER", "ADMIN", "APEX")
+                .contains(roleName.trim().toUpperCase());
     }
 }

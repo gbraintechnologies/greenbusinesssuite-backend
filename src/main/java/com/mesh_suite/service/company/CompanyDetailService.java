@@ -14,13 +14,18 @@ import com.mesh_suite.dto.Paginate;
 import com.mesh_suite.dto.request.*;
 import com.mesh_suite.dto.response.CompanyResponseDTO;
 import com.mesh_suite.dto.response.MessageResponse;
+import com.mesh_suite.dto.response.UserResponse;
 import com.mesh_suite.exception.ResourceNotFoundException;
 import com.mesh_suite.interceptor.TenantContext;
 import com.mesh_suite.mapper.UserCompanyMapper;
+import com.mesh_suite.mapper.UsersMapper;
 import com.mesh_suite.service.notify.EmailService;
 import com.mesh_suite.util.CodeGenerator;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Session;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,6 +36,7 @@ import org.springframework.util.StringUtils;
 import java.io.UnsupportedEncodingException;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,6 +51,10 @@ public class CompanyDetailService {
     private final CodeGenerator codeGenerator;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final UsersMapper usersMapper;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional
     public CompanyRegResp createCompany(CompanyCreateDTO request) throws UnsupportedEncodingException {
@@ -302,6 +312,7 @@ public class CompanyDetailService {
                     .roleName("ADMIN")
                     .role(adminRole)
                     .companyIdentifier(tenantId)
+                    .tenantId(tenantId)
                     .isVerified(true)
                     .enabled(true)
                     .createdOn(LocalDateTime.now())
@@ -332,6 +343,40 @@ public class CompanyDetailService {
         } catch (Exception e) {
             log.error("Failed to create tenant admin:", e);
             throw new RuntimeException("Failed to create tenant admin");
+        }
+    }
+
+    public List<UserResponse> listCompanyAdmins(String companyIdentifier) {
+        requireCompany(companyIdentifier);
+        return withTenantFilterDisabled(() -> usersMapper.toUserResponses(
+                userRepository.findAdminsByCompanyIdentifier(companyIdentifier.trim())));
+    }
+
+    public List<UserResponse> listCompanyClients(String companyIdentifier) {
+        requireCompany(companyIdentifier);
+        return withTenantFilterDisabled(() -> usersMapper.toUserResponses(
+                userRepository.findClientsByCompanyIdentifier(companyIdentifier.trim())));
+    }
+
+    private UserCompany requireCompany(String companyIdentifier) {
+        if (!StringUtils.hasText(companyIdentifier)) {
+            throw new ResourceNotFoundException("Company identifier is required");
+        }
+        return userCompanyRepository.findByCompanyIdentifier(companyIdentifier.trim())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Company not found with identifier: " + companyIdentifier));
+    }
+
+    private <T> T withTenantFilterDisabled(java.util.function.Supplier<T> action) {
+        Session session = entityManager.unwrap(Session.class);
+        session.disableFilter("tenantFilter");
+        try {
+            return action.get();
+        } finally {
+            String tenant = TenantContext.getCurrentTenant();
+            if (StringUtils.hasText(tenant)) {
+                session.enableFilter("tenantFilter").setParameter("tenantId", tenant);
+            }
         }
     }
 }
