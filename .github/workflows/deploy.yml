@@ -45,6 +45,7 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
+            git config --global --add safe.directory /var/www/greenbusinesssuite-backend
             cd /var/www/greenbusinesssuite-backend
             git fetch origin main
             git reset --hard origin/main
