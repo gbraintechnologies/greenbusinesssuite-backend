@@ -18,11 +18,14 @@ public interface UserCompanyRepository extends JpaRepository<UserCompany, Long> 
     Page<UserCompany> findByCompanyAdmin_Id(Long userId, Pageable pageable);
 
     Page<UserCompany> findByCompanyAdmin_CompanyIdentifier(String companyIdentifier, Pageable pageable);
+
+    @Query("SELECT uc FROM UserCompany uc WHERE COALESCE(uc.isDeleted, false) = false")
+    Page<UserCompany> findAllNotDeleted(Pageable pageable);
     
     // Company-specific methods
     UserCompany findByCompanyNameContainingIgnoreCase(String companyName);
     
-    @Query("SELECT uc FROM UserCompany uc WHERE uc.status = :status")
+    @Query("SELECT uc FROM UserCompany uc WHERE uc.status = :status AND COALESCE(uc.isDeleted, false) = false")
     Page<UserCompany> findByStatus(@Param("status") CompanyStatus status, Pageable pageable);
     
     // Additional useful company queries

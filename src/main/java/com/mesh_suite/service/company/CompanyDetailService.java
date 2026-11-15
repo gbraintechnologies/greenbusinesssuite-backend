@@ -26,9 +26,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -73,13 +75,109 @@ public class CompanyDetailService {
         companyMigrationService.provisionTenant(company);
         userCompanyRepository.save(company);
 
-        return UserCompanyMapper.toRegResp(company, "Company setup successful");
+        // Create primary contact as company admin and email Company ID + initial password
+        boolean emailSent = provisionPrimaryContactAdmin(company);
+
+        String message = emailSent
+                ? "Company setup successful. Registration email with Company ID and initial password sent to primary contact."
+                : "Company setup successful. Registration email was not sent (missing contact email or account already exists).";
+
+        return UserCompanyMapper.toRegResp(company, message);
     }
 
-    // ── everything below is unchanged ────────────────────────────────────────
+    /**
+     * Creates an ADMIN account for the primary contact (if email is present and unused)
+     * and emails them the company identifier + temporary password.
+     * @return true when a registration email was sent
+     */
+    private boolean provisionPrimaryContactAdmin(UserCompany company) {
+        String email = company.getPrimaryContactEmail();
+        if (!StringUtils.hasText(email)) {
+            log.warn("Skipping registration email — company {} has no primary contact email", company.getId());
+            return false;
+        }
+
+        String tenantId = company.getCompanyIdentifier();
+        if (!StringUtils.hasText(tenantId)) {
+            log.warn("Skipping registration email — company {} has no identifier", company.getId());
+            return false;
+        }
+
+        if (userRepository.existsByEmail(email.trim())) {
+            log.info("Primary contact email {} already exists — sending credentials refresh is skipped; linking if possible", email);
+            userRepository.findByEmailIgnoreCase(email.trim()).ifPresent(existing -> {
+                if (!StringUtils.hasText(existing.getCompanyIdentifier())) {
+                    existing.setCompanyIdentifier(tenantId);
+                    userRepository.save(existing);
+                }
+                if (company.getCompanyAdmin() == null) {
+                    company.setCompanyAdmin(existing);
+                    userCompanyRepository.save(company);
+                }
+            });
+            return false;
+        }
+
+        try {
+            Role adminRole = roleRepository.findByRoleNameAndTenantId("ADMIN", tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Admin role not found for tenant: " + tenantId));
+
+            String rawPassword = codeGenerator.generateTemporaryPassword();
+            String[] nameParts = splitContactName(company.getPrimaryContactName());
+
+            Users admin = Users.builder()
+                    .firstName(nameParts[0])
+                    .lastName(nameParts[1])
+                    .username(email.trim())
+                    .email(email.trim())
+                    .password(passwordEncoder.encode(rawPassword))
+                    .phoneNumber(company.getPrimaryContactPhoneNumber())
+                    .status(UserStatus.ACTIVE)
+                    .roleName("ADMIN")
+                    .role(adminRole)
+                    .companyIdentifier(tenantId)
+                    .isVerified(true)
+                    .enabled(true)
+                    .createdOn(LocalDateTime.now())
+                    .build();
+
+            userRepository.saveAndFlush(admin);
+            company.setCompanyAdmin(admin);
+            userCompanyRepository.save(company);
+
+            emailService.sendCompanyRegistrationEmail(
+                    admin.getEmail(),
+                    admin.getFirstName(),
+                    company.getCompanyName(),
+                    tenantId,
+                    rawPassword
+            );
+            log.info("Registration email sent for company {} to {}", tenantId, admin.getEmail());
+            return true;
+        } catch (Exception e) {
+            // Company creation should still succeed even if invite email fails
+            log.error("Failed to provision primary contact admin for company {}: ", company.getId(), e);
+            return false;
+        }
+    }
+
+    private String[] splitContactName(String fullName) {
+        if (!StringUtils.hasText(fullName)) {
+            return new String[]{"Admin", "User"};
+        }
+        String trimmed = fullName.trim();
+        int space = trimmed.indexOf(' ');
+        if (space < 0) {
+            return new String[]{trimmed, "Admin"};
+        }
+        return new String[]{
+                trimmed.substring(0, space).trim(),
+                trimmed.substring(space + 1).trim()
+        };
+    }
 
     public Paginate<CompanyResponseDTO> getAllCompanies(Pageable pageable) {
-        Page<UserCompany> companies = userCompanyRepository.findAll(pageable);
+        Page<UserCompany> companies = userCompanyRepository.findAllNotDeleted(pageable);
         return toPaginate(companies, UserCompanyMapper::toResponseDto);
     }
 
@@ -96,6 +194,19 @@ public class CompanyDetailService {
     public CompanyResponseDTO getById(Long id) {
         UserCompany company = userCompanyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Company not found with id: " + id));
+        if (Boolean.TRUE.equals(company.getIsDeleted())) {
+            throw new ResourceNotFoundException("Company not found with id: " + id);
+        }
+        return UserCompanyMapper.toResponseDto(company);
+    }
+
+    public CompanyResponseDTO getByIdentifier(String companyIdentifier) {
+        UserCompany company = userCompanyRepository.findByCompanyIdentifier(companyIdentifier)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Company not found with identifier: " + companyIdentifier));
+        if (Boolean.TRUE.equals(company.getIsDeleted())) {
+            throw new ResourceNotFoundException("Company not found with identifier: " + companyIdentifier);
+        }
         return UserCompanyMapper.toResponseDto(company);
     }
 
@@ -145,6 +256,25 @@ public class CompanyDetailService {
         return UserCompanyMapper.toUpdateDto(company);
     }
 
+    @Transactional
+    public MessageResponse deleteCompany(Long id) {
+        UserCompany company = userCompanyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Company not found with id: " + id));
+
+        if (Boolean.TRUE.equals(company.getIsDeleted())) {
+            return new MessageResponse("Company already deleted");
+        }
+
+        company.setIsDeleted(true);
+        company.setDeletedOn(ZonedDateTime.now());
+        company.setStatus(CompanyStatus.INACTIVE);
+        userCompanyRepository.save(company);
+
+        log.info("Soft-deleted company id={} identifier={}", company.getId(), company.getCompanyIdentifier());
+        return new MessageResponse("Company deleted successfully");
+    }
+
+    @Transactional
     public MessageResponse assignTenantAdmin(CreateUserRequest request) {
         try {
             String tenantId = TenantContext.getCurrentTenant();
@@ -171,10 +301,27 @@ public class CompanyDetailService {
                     .build();
 
             userRepository.saveAndFlush(user);
-            log.info("Admin user created successfully for tenant: {}", tenantId);
-            emailService.sendTemporaryPasswordEmail(user, rawPassword);
 
-            return new MessageResponse("Admin user assigned successfully! Temporary password sent.");
+            var companyOpt = userCompanyRepository.findByCompanyIdentifier(tenantId);
+            if (companyOpt.isPresent()) {
+                UserCompany company = companyOpt.get();
+                if (company.getCompanyAdmin() == null) {
+                    company.setCompanyAdmin(user);
+                    userCompanyRepository.save(company);
+                }
+                emailService.sendCompanyRegistrationEmail(
+                        user.getEmail(),
+                        user.getFirstName(),
+                        company.getCompanyName(),
+                        tenantId,
+                        rawPassword
+                );
+            } else {
+                emailService.sendTemporaryPasswordEmail(user, rawPassword);
+            }
+
+            log.info("Admin user created successfully for tenant: {}", tenantId);
+            return new MessageResponse("Admin user assigned successfully! Company ID and temporary password sent.");
         } catch (Exception e) {
             log.error("Failed to create tenant admin:", e);
             throw new RuntimeException("Failed to create tenant admin");

@@ -49,6 +49,20 @@ public class CompanyController {
         return ResponseEntity.ok(companyResponseEnricher.enrich(companyDetailService.getById(id)));
     }
 
+    @Operation(summary = "Get company by public identifier (tenant slug)")
+    @GetMapping("/identifier/{companyIdentifier}")
+    public ResponseEntity<CompanyResponseDTO> getCompanyByIdentifier(
+            @PathVariable @NotBlank String companyIdentifier) {
+        return ResponseEntity.ok(
+                companyResponseEnricher.enrich(companyDetailService.getByIdentifier(companyIdentifier)));
+    }
+
+    @Operation(summary = "Soft-delete a company")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<MessageResponse> deleteCompany(@PathVariable Long id) {
+        return ResponseEntity.ok(companyDetailService.deleteCompany(id));
+    }
+
     @Operation(summary = "Search User Company by Company Name")
     @GetMapping("/get-company-by-name/{name}")
     public ResponseEntity<CompanyResponseDTO> searchCompanyByName(

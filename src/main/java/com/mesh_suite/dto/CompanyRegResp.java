@@ -18,6 +18,7 @@ public class CompanyRegResp {
     private String primaryContactName;
     private String primaryContactEmail;
     private String companyCode;
+    private String companyIdentifier;
     private List<Long> assignedFormIds;
     private String message;
 }

@@ -150,6 +150,7 @@ public class UserCompanyMapper {
                 .primaryContactName(entity.getPrimaryContactName())
                 .primaryContactEmail(entity.getPrimaryContactEmail())
                 .companyCode(entity.getCompanyCode())
+                .companyIdentifier(entity.getCompanyIdentifier())
                 .assignedFormIds(entity.getAssignedFormIds())
                 .message(message)
                 .build();

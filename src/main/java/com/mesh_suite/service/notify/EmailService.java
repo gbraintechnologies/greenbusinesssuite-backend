@@ -60,12 +60,62 @@ public class EmailService {
     @Async("emailExecutor")
     public void sendTemporaryPasswordEmail(Users user, String tempPassword) {
         try {
-            String content = buildTemporaryPasswordTemplate(user.getFirstName(), tempPassword);
-            sendEmail(user.getEmail(), "Your Temporary Password - MESH", content, true);
+            String companyId = user.getCompanyIdentifier();
+            String content = buildTemporaryPasswordTemplate(
+                    user.getFirstName(),
+                    tempPassword,
+                    companyId,
+                    buildTenantLoginUrl(companyId, null)
+            );
+            sendEmail(user.getEmail(), "Your Temporary Password - Green Business Suite", content, true);
         } catch (Exception e) {
             log.error("Failed to send temporary password email to {} - full error: ", user.getEmail(), e);
 
         }
+    }
+
+    /** Company registration invite: company ID + initial password + login link. */
+    @Async("emailExecutor")
+    public void sendCompanyRegistrationEmail(
+            String recipientEmail,
+            String recipientName,
+            String companyName,
+            String companyIdentifier,
+            String tempPassword
+    ) {
+        try {
+            String loginUrl = buildTenantLoginUrl(companyIdentifier, companyName);
+            String content = buildCompanyRegistrationTemplate(
+                    recipientName,
+                    companyName,
+                    companyIdentifier,
+                    tempPassword,
+                    loginUrl
+            );
+            sendEmail(
+                    recipientEmail,
+                    "Your Company Account - Green Business Suite",
+                    content,
+                    true
+            );
+        } catch (Exception e) {
+            log.error("Failed to send company registration email to {} - full error: ", recipientEmail, e);
+        }
+    }
+
+    private String buildTenantLoginUrl(String companyIdentifier, String companyName) {
+        if (!StringUtils.hasText(companyIdentifier)) {
+            return "https://greenbusinesssuite.com";
+        }
+        String encodedName = "";
+        if (StringUtils.hasText(companyName)) {
+            try {
+                encodedName = "?c=" + java.net.URLEncoder.encode(companyName, java.nio.charset.StandardCharsets.UTF_8);
+            } catch (Exception ignored) {
+                encodedName = "";
+            }
+        }
+        return "https://greenbusinesssuite.com/" + companyIdentifier + "/auth" + encodedName;
     }
 
     // For non-privileged users only
@@ -228,21 +278,73 @@ public class EmailService {
 
     // ===================== HTML TEMPLATES =====================
 
-    private String buildTemporaryPasswordTemplate(String name, String tempPassword) {
+    private String buildTemporaryPasswordTemplate(
+            String name,
+            String tempPassword,
+            String companyIdentifier,
+            String loginUrl
+    ) {
+        String companyIdBlock = StringUtils.hasText(companyIdentifier)
+                ? """
+                  <p><strong>Company ID:</strong></p>
+                  <div style="background-color: #ffffff; border: 1px solid #e1e1e1; border-radius: 6px; padding: 14px; text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 1px; margin-bottom: 16px;">%s</div>
+                  """.formatted(companyIdentifier)
+                : "";
+        String loginBlock = StringUtils.hasText(loginUrl)
+                ? """
+                  <p style="text-align:center; margin: 24px 0;">
+                    <a href="%s" style="display: inline-block; background-color: #0f766e; color: white; text-decoration: none; border-radius: 6px; padding: 10px 20px; font-weight: bold;">Log in to your portal</a>
+                  </p>
+                  """.formatted(loginUrl)
+                : "";
         return """
         <html>
           <body style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; color: #333;">
             <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
-              <h2 style="color: #2c3e50; text-align: center;">Welcome to MESH</h2>
+              <h2 style="color: #2c3e50; text-align: center;">Welcome to Green Business Suite</h2>
               <p>Dear %s,</p>
-              <p>Your privileged account has been created successfully. Use the temporary password below to log in:</p>
+              <p>Your administrator account has been created successfully. Use the details below to log in:</p>
+              %s
+              <p><strong>Temporary Password:</strong></p>
               <div style="background-color: #ffffff; border: 1px solid #e1e1e1; border-radius: 6px; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 2px;">%s</div>
+              %s
               <p>We recommend changing your password immediately after logging in.</p>
-              <p style="margin-top: 30px; color: #7f8c8d; font-size: 14px; text-align: center;">Best regards,<br><strong>The MESH Team</strong></p>
+              <p style="margin-top: 30px; color: #7f8c8d; font-size: 14px; text-align: center;">Best regards,<br><strong>The Green Business Suite Team</strong></p>
             </div>
           </body>
         </html>
-        """.formatted(name, tempPassword);
+        """.formatted(name, companyIdBlock, tempPassword, loginBlock);
+    }
+
+    private String buildCompanyRegistrationTemplate(
+            String name,
+            String companyName,
+            String companyIdentifier,
+            String tempPassword,
+            String loginUrl
+    ) {
+        String safeName = StringUtils.hasText(name) ? name : "there";
+        String safeCompany = StringUtils.hasText(companyName) ? companyName : "your company";
+        return """
+        <html>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; color: #333;">
+            <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
+              <h2 style="color: #2c3e50; text-align: center;">Company Registration Complete</h2>
+              <p>Dear %s,</p>
+              <p><strong>%s</strong> has been registered on <strong>Green Business Suite</strong>. Use the credentials below to access your company portal:</p>
+              <p><strong>Company ID:</strong></p>
+              <div style="background-color: #ffffff; border: 1px solid #e1e1e1; border-radius: 6px; padding: 14px; text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 1px; margin-bottom: 16px;">%s</div>
+              <p><strong>Initial Password:</strong></p>
+              <div style="background-color: #ffffff; border: 1px solid #e1e1e1; border-radius: 6px; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 2px;">%s</div>
+              <p style="text-align:center; margin: 24px 0;">
+                <a href="%s" style="display: inline-block; background-color: #0f766e; color: white; text-decoration: none; border-radius: 6px; padding: 10px 20px; font-weight: bold;">Open company portal</a>
+              </p>
+              <p>Sign in with your email and the initial password above. Please change your password after logging in.</p>
+              <p style="margin-top: 30px; color: #7f8c8d; font-size: 14px; text-align: center;">Best regards,<br><strong>The Green Business Suite Team</strong></p>
+            </div>
+          </body>
+        </html>
+        """.formatted(safeName, safeCompany, companyIdentifier, tempPassword, loginUrl);
     }
 
     private String buildVerificationLinkTemplate(String name, String link) {
