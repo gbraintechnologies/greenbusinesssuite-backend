@@ -54,33 +54,39 @@ public class SuiteAppService {
 
     @Transactional
     public void seedDefaultsIfEmpty() {
-        if (suiteAppRepository.count() > 0) {
-            return;
+        try {
+            if (suiteAppRepository.count() > 0) {
+                return;
+            }
+            suiteAppRepository.save(SuiteApp.builder()
+                    .name("Autobus")
+                    .tagline("AI-powered business operations")
+                    .description("Customers, sales, marketing, and your team in one operations workspace.")
+                    .href("https://useautobus.com/")
+                    .category("Operations")
+                    .published(true)
+                    .mark("A")
+                    .accent("bg-[#14532d]")
+                    .wash("bg-[#f0fdf4]")
+                    .sortOrder(1)
+                    .build());
+            suiteAppRepository.save(SuiteApp.builder()
+                    .name("GREENPOS")
+                    .tagline("Point of sale for growing shops")
+                    .description("Take sales, track stock, and close the day from a POS built for African businesses.")
+                    .href("https://www.usegreenpos.com/")
+                    .category("Point of sale")
+                    .published(true)
+                    .mark("G")
+                    .accent("bg-[#0b57d0]")
+                    .wash("bg-[#e8f0fe]")
+                    .sortOrder(2)
+                    .build());
+        } catch (Exception ex) {
+            // Table may not exist yet on first boot before DDL/migration runs.
+            org.slf4j.LoggerFactory.getLogger(SuiteAppService.class)
+                    .warn("Skipping suite app seed: {}", ex.getMessage());
         }
-        suiteAppRepository.save(SuiteApp.builder()
-                .name("Autobus")
-                .tagline("AI-powered business operations")
-                .description("Customers, sales, marketing, and your team in one operations workspace.")
-                .href("https://useautobus.com/")
-                .category("Operations")
-                .published(true)
-                .mark("A")
-                .accent("bg-[#14532d]")
-                .wash("bg-[#f0fdf4]")
-                .sortOrder(1)
-                .build());
-        suiteAppRepository.save(SuiteApp.builder()
-                .name("GREENPOS")
-                .tagline("Point of sale for growing shops")
-                .description("Take sales, track stock, and close the day from a POS built for African businesses.")
-                .href("https://www.usegreenpos.com/")
-                .category("Point of sale")
-                .published(true)
-                .mark("G")
-                .accent("bg-[#0b57d0]")
-                .wash("bg-[#e8f0fe]")
-                .sortOrder(2)
-                .build());
     }
 
     private SuiteApp apply(SuiteApp app, SuiteAppRequest request) {
