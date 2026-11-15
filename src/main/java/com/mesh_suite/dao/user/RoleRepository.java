@@ -15,6 +15,8 @@ public interface RoleRepository extends JpaRepository<Role,Long> {
     boolean existsByIdAndRoleName(Long roleId, String roleName);
     Optional<Role> findByRoleName(String roleName);
 
+    List<Role> findAllByRoleName(String roleName);
+
     Optional<Role> findByRoleNameAndTenantId(String roleName, String tenantId);
 
     @Query("SELECT r.roleName FROM Role r ORDER BY r.roleName ASC")

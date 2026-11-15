@@ -1,6 +1,7 @@
 package com.mesh_suite.service.user;
 
 
+import com.mesh_suite.constant.shared.AppConstants;
 import com.mesh_suite.dto.Paginate;
 import com.mesh_suite.dto.request.RoleRequest;
 import com.mesh_suite.exception.BadRequestException;
@@ -9,6 +10,7 @@ import com.mesh_suite.domain.user.Permission;
 import com.mesh_suite.domain.user.Role;
 import com.mesh_suite.dao.user.PermissionRepository;
 import com.mesh_suite.dao.user.RoleRepository;
+import com.mesh_suite.interceptor.TenantContext;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -16,11 +18,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Sort;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.Set;
 
@@ -188,10 +192,38 @@ public class RoleService {
         }
         
     }
-    // get permissions by role name
+    /**
+     * Resolve permissions for a role name in a multi-tenant-safe way.
+     * Roles are unique per (tenant_id, role_name), so a bare findByRoleName
+     * throws NonUniqueResultException once more than one tenant has ADMIN/CLIENT.
+     */
     public List<Permission> getRolePermission(String roleName) {
-        Role role = RoleRepository.findByRoleName(roleName)
+        Role role = resolveRoleByName(roleName)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with name: " + roleName));
         return new ArrayList<>(role.getPermissions());
+    }
+
+    private Optional<Role> resolveRoleByName(String roleName) {
+        String tenantId = TenantContext.getCurrentTenant();
+
+        if (StringUtils.hasText(tenantId)) {
+            Optional<Role> scoped = RoleRepository.findByRoleNameAndTenantId(roleName, tenantId);
+            if (scoped.isPresent()) {
+                return scoped;
+            }
+            if (!AppConstants.DEFAULT_TENANT_ID.equals(tenantId)) {
+                Optional<Role> master = RoleRepository.findByRoleNameAndTenantId(
+                        roleName, AppConstants.DEFAULT_TENANT_ID);
+                if (master.isPresent()) {
+                    return master;
+                }
+            }
+        }
+
+        List<Role> matches = RoleRepository.findAllByRoleName(roleName);
+        if (matches.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(matches.get(0));
     }
 }
