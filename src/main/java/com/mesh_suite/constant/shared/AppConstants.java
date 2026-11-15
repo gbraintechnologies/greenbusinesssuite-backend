@@ -44,6 +44,13 @@ public final class AppConstants {
     };
 
     public static final String DEFAULT_TENANT_ID = "mesh_suite_db";
+
+    /**
+     * Single operating company for Green Business Suite.
+     * Platform forms, apps, and Green Account clients bind here.
+     */
+    public static final String DEFAULT_COMPANY_IDENTIFIER = "busi88056";
+
     public static final String CALLBACK_PATH = "/mesh-suite/v1.0/payments/trigger/callback";
     public static final String TENANT_ID_PARAM = "tenantid";
     public static final String CHECK_TRANSACTION_URL = "https://orchard-api.anmgw.com/checkTransaction";

@@ -377,15 +377,8 @@ public class AuthService {
     }
 
     private String resolveCompanyTenant(String companyIdentifier, HttpServletRequest request) {
-        if (StringUtils.hasText(companyIdentifier)) {
-            return companyIdentifier.trim();
-        }
-        String headerTenant = request != null ? request.getHeader("tenantid") : null;
-        if (StringUtils.hasText(headerTenant)
-                && !AppConstants.DEFAULT_TENANT_ID.equalsIgnoreCase(headerTenant.trim())) {
-            return headerTenant.trim();
-        }
-        return null;
+        // Single-company product: every client belongs to BusinessSuite (busi88056).
+        return AppConstants.DEFAULT_COMPANY_IDENTIFIER;
     }
 
     private Role resolveSignupRole(Long requestedRoleId) {

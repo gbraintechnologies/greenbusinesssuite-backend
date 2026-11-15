@@ -80,6 +80,16 @@ public class FormsService {
             });
         }
 
+        // Single-company product: new platform services belong to BusinessSuite.
+        if (form.getCompanyId() == null || form.getCompanyId() == 0L) {
+            userCompanyRepository.findByCompanyIdentifier(
+                            com.mesh_suite.constant.shared.AppConstants.DEFAULT_COMPANY_IDENTIFIER)
+                    .ifPresent(company -> {
+                        form.setCompanyId(company.getId());
+                        form.setAssignDate(LocalDateTime.now());
+                    });
+        }
+
         Forms savedForm = formsRepository.save(form);
         return savedForm.getId();
     }
@@ -94,6 +104,7 @@ public class FormsService {
         duplicatedForm.setCompanyId(0L);
         duplicatedForm.setUrl(""); // Reset URL for duplication
         duplicatedForm.setDescription(originalForm.getDescription());
+        duplicatedForm.setServiceCategory(originalForm.getServiceCategory());
         duplicatedForm.setFormInstruction(originalForm.getFormInstruction());
         duplicatedForm.setUserMandatory(originalForm.getUserMandatory());
         duplicatedForm.setDeadline(originalForm.getDeadline());
@@ -102,6 +113,13 @@ public class FormsService {
         duplicatedForm.setIsAnonymous(originalForm.getIsAnonymous());
         duplicatedForm.setRedirectUrl(originalForm.getRedirectUrl());
         duplicatedForm.setMultipleForms(originalForm.getMultipleForms());
+
+        userCompanyRepository.findByCompanyIdentifier(
+                        com.mesh_suite.constant.shared.AppConstants.DEFAULT_COMPANY_IDENTIFIER)
+                .ifPresent(company -> {
+                    duplicatedForm.setCompanyId(company.getId());
+                    duplicatedForm.setAssignDate(LocalDateTime.now());
+                });
 
         // Copy form sections and form fields
         for (FormSections originalSection : originalForm.getFormSections()) {

@@ -44,6 +44,10 @@ public class Forms implements Serializable {
 
     private String description;
 
+    /** Service category for BusinessSuite (e.g. Financial, Non-government). */
+    @Column(name = "service_category", length = 120)
+    private String serviceCategory;
+
     @Column(name = "form_instruction")
     private String formInstruction;
 
