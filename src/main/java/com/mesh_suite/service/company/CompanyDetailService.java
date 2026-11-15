@@ -73,10 +73,16 @@ public class CompanyDetailService {
         // No physical database to provision anymore — just seed the tenant's default roles
         // and flip it ACTIVE, atomically with company creation.
         companyMigrationService.provisionTenant(company);
-        userCompanyRepository.save(company);
+        userCompanyRepository.saveAndFlush(company);
 
-        // Create primary contact as company admin and email Company ID + initial password
-        boolean emailSent = provisionPrimaryContactAdmin(company);
+        // Create primary contact as company admin and email Company ID + initial password.
+        // Run after flush so a admin-provision failure cannot roll back company creation.
+        boolean emailSent = false;
+        try {
+            emailSent = provisionPrimaryContactAdmin(company);
+        } catch (Exception e) {
+            log.error("Primary contact provisioning failed for company {}: ", company.getId(), e);
+        }
 
         String message = emailSent
                 ? "Company setup successful. Registration email with Company ID and initial password sent to primary contact."
@@ -132,6 +138,7 @@ public class CompanyDetailService {
                     .email(email.trim())
                     .password(passwordEncoder.encode(rawPassword))
                     .phoneNumber(company.getPrimaryContactPhoneNumber())
+                    .profileImage("")
                     .status(UserStatus.ACTIVE)
                     .roleName("ADMIN")
                     .role(adminRole)
