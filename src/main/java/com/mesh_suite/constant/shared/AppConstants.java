@@ -12,6 +12,7 @@ public final class AppConstants {
             "/mesh-suite/v1.0/company-branding/**",
             "/mesh-suite/v1.0/s3/resource/**",
             "/mesh-suite/v1.0/media/**",
+            "/mesh-suite/v1.0/suite-apps/published",
             "/mesh-suite/v1.0/external/forms-service/client",
             "/mesh-suite/v1.0/external/forms-service/token",
             "/mesh-suite/v1.0/external/forms-service/forms/create",

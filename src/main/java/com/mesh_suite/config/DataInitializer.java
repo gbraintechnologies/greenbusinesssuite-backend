@@ -13,6 +13,7 @@ import com.mesh_suite.domain.user.Permission;
 import com.mesh_suite.domain.user.Role;
 import com.mesh_suite.domain.user.Users;
 import com.mesh_suite.interceptor.TenantContext;
+import com.mesh_suite.service.suite.SuiteAppService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PermissionRepository permissionRepository;
     private final UserCompanyRepository userCompanyRepository;
+    private final SuiteAppService suiteAppService;
 
     private static final List<PermissionSeed> PERMISSIONS = Arrays.asList(
             new PermissionSeed("company", "branch", "search", "Search Company Branch"),
@@ -114,6 +116,7 @@ public class DataInitializer implements CommandLineRunner {
             initializeRolesWithPermissions();
             initializeApexUser();
             ensureApexHasAllPermissions();
+            suiteAppService.seedDefaultsIfEmpty();
 
             log.info("========================================");
             log.info("✅ Data initialization completed successfully!");
