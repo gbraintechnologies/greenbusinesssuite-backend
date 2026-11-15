@@ -10,6 +10,7 @@ public final class AppConstants {
             "/mesh-suite/v1.0/forms/builder/**",
             "/mesh-suite/v1.0/categories",
             "/mesh-suite/v1.0/company-branding/**",
+            "/mesh-suite/v1.0/companies/identifier/**",
             "/mesh-suite/v1.0/s3/resource/**",
             "/mesh-suite/v1.0/media/**",
             "/mesh-suite/v1.0/suite-apps/published",
