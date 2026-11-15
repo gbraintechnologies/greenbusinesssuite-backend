@@ -33,11 +33,27 @@ public interface GeaProgramRecordRepository extends JpaRepository<GeaProgramReco
             """, nativeQuery = true)
     long countDistinctForProgram(@Param("recordType") String recordType, @Param("programId") String programId);
 
-    @Query("""
-            select coalesce(sum(r.approvedAmount), 0) from GeaProgramRecord r
-            where r.recordType = :recordType
-              and (:programId = 'all' or r.programId = :programId)
-            """)
+    /**
+     * Sum facility amounts for "Total disbursed".
+     * Excludes spreadsheet total rows, absurd outliers (&gt;= GHS 1M), Ernest v2
+     * (duplicate of v1), application pipelines that have a disbursed/beneficiary
+     * sibling dataset, and ICE regional finalists (not disbursed).
+     */
+    @Query(value = """
+            SELECT COALESCE(SUM(approved_amount), 0)
+            FROM gea_program_record
+            WHERE record_type = :recordType
+              AND approved_amount IS NOT NULL
+              AND approved_amount > 0
+              AND approved_amount < 1000000
+              AND COALESCE(BTRIM(external_key), '') !~* '^(total|grand total|sum)$'
+              AND (
+                    :programId <> 'all' AND program_id = :programId
+                 OR :programId = 'all' AND program_id NOT IN (
+                        'ernest_v2', 'nkosuo', 'capbuss', 'ice_regional'
+                    )
+              )
+            """, nativeQuery = true)
     BigDecimal sumApproved(@Param("recordType") String recordType, @Param("programId") String programId);
 
     @Query(value = """

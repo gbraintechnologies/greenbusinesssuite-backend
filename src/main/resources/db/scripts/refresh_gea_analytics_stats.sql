@@ -8,6 +8,7 @@ SELECT
     program_id,
     record_type,
     COALESCE(NULLIF(BTRIM(phone), ''), 'id:' || id::text) AS biz_id,
+    COALESCE(BTRIM(external_key), '') AS external_key,
     gender,
     region,
     sector,
@@ -84,9 +85,17 @@ INSERT INTO gea_analytics_stat (scope, program_id, dimension, name, value)
 SELECT 'loan_grant', 'all', 'total', '', COUNT(DISTINCT biz_id)::numeric
 FROM _gea_biz WHERE record_type = 'loan_grant';
 
+-- Total disbursed (all): exclude summary rows, outliers, Ernest v2 duplicate,
+-- application pipelines that have disbursed/beneficiary siblings, and finalists.
 INSERT INTO gea_analytics_stat (scope, program_id, dimension, name, value)
 SELECT 'loan_grant', 'all', 'disbursed', '', COALESCE(SUM(approved_amount), 0)
-FROM _gea_biz WHERE record_type = 'loan_grant';
+FROM _gea_biz
+WHERE record_type = 'loan_grant'
+  AND approved_amount IS NOT NULL
+  AND approved_amount > 0
+  AND approved_amount < 1000000
+  AND external_key !~* '^(total|grand total|sum)$'
+  AND program_id NOT IN ('ernest_v2', 'nkosuo', 'capbuss', 'ice_regional');
 
 INSERT INTO gea_analytics_stat (scope, program_id, dimension, name, value)
 SELECT 'loan_grant', program_id, 'total', '', COUNT(DISTINCT biz_id)::numeric
@@ -95,7 +104,12 @@ GROUP BY program_id;
 
 INSERT INTO gea_analytics_stat (scope, program_id, dimension, name, value)
 SELECT 'loan_grant', program_id, 'disbursed', '', COALESCE(SUM(approved_amount), 0)
-FROM _gea_biz WHERE record_type = 'loan_grant'
+FROM _gea_biz
+WHERE record_type = 'loan_grant'
+  AND approved_amount IS NOT NULL
+  AND approved_amount > 0
+  AND approved_amount < 1000000
+  AND external_key !~* '^(total|grand total|sum)$'
 GROUP BY program_id;
 
 INSERT INTO gea_analytics_stat (scope, program_id, dimension, name, value)
